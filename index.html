@@ -65,6 +65,13 @@
   .hero-cell span{display:block;font-size:12px;color:rgba(242,243,238,.68)}
   .hero-cell b{font-family:var(--serif);font-variant-numeric:tabular-nums;font-size:19px;font-weight:600}
 
+  .cartao-boxes{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:26px}
+  .cartao-box{flex:1;min-width:170px;border-radius:3px;padding:16px 18px;color:var(--paper)}
+  .cartao-box span{display:block;font-size:12.5px;color:rgba(242,243,238,.75)}
+  .cartao-box b{display:block;font-family:var(--serif);font-variant-numeric:tabular-nums;font-size:26px;font-weight:600;margin-top:4px}
+  .cartao-box.c-azul{background:linear-gradient(155deg,var(--azul-esc),var(--azul))}
+  .cartao-box.c-ultravioleta{background:linear-gradient(155deg,var(--violeta-esc),var(--violeta))}
+
   .destino{border:1px solid var(--rule);border-radius:3px;padding:14px 16px;margin-bottom:30px;background:#F8F9F5}
   .destino h3{margin:0 0 2px;font-size:14px;font-weight:600}
   .destino p{margin:0 0 12px;font-size:13px;color:var(--muted);max-width:62ch}
@@ -476,23 +483,6 @@
     return criadas;
   }
 
-  // varre os lançamentos parcelados já existentes no mês aberto e completa
-  // nos meses seguintes as parcelas que ainda faltam (para dados lançados
-  // antes dessa propagação automática existir, ou importados sem passar por ela).
-  async function replicarParcelasExistentes(){
-    var alvos=mes.lancamentos.filter(function(l){
-      if(!l.parcelado) return false;
-      var pc=detectaParcela(l.descricao);
-      return pc && pc.atual<pc.total;
-    });
-    var total=0;
-    for(var i=0;i<alvos.length;i++){
-      var l=alvos[i], pc=detectaParcela(l.descricao);
-      total+=await propagarParcelas({data:l.data,descricao:l.descricao,categoria:l.categoria,valor:l.valor,conta:l.conta},pc);
-    }
-    return {itens:alvos.length,criadas:total};
-  }
-
   function normalizar(arr){
     return arr.map(function(x){
       var d=String(x.data||'').slice(0,10);
@@ -724,16 +714,21 @@
     h+='<button class="arrow" data-nav="ant" '+(idx<=0?'disabled':'')+' aria-label="Mês anterior">‹</button>';
     h+='<h1>Cartões · '+esc(nomeMesCurto(mesId))+'</h1>';
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
-    h+='</div><div class="tools"><button class="toolbtn" data-act="replicar-parcelas" title="Completa nos meses seguintes as parcelas já lançadas aqui, mas que ainda não foram replicadas">Replicar parcelas deste mês</button></div></div>';
+    h+='</div></div>';
 
     h+='<div class="hero hero-cartoes"><div class="hero-label">Nos cartões em '+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num">'+money(totMes)+'</div>';
     h+='<div class="hero-sub">Já contado nas saídas do mês — este painel é só para separar o que é parcela do que é compra do mês.</div>';
     h+='<div class="hero-grid">';
-    cartoes.forEach(function(c){ h+='<div class="hero-cell"><span>'+esc(c.nome)+'</span><b>'+money(totConta(m,c.id))+'</b></div>'; });
     h+='<div class="hero-cell"><span>Parcelado</span><b>'+money(totParceladoMes)+'</b></div>';
     h+='<div class="hero-cell"><span>Compras do mês</span><b>'+money(totAvulsoMes)+'</b></div>';
     h+='</div></div>';
+
+    h+='<div class="cartao-boxes">';
+    cartoes.forEach(function(c){
+      h+='<div class="cartao-box c-'+c.id+'"><span>'+esc(c.nome)+'</span><b>'+money(totConta(m,c.id))+'</b></div>';
+    });
+    h+='</div>';
 
     h+='<section><div class="sec-head"><h2>Lançar pelo texto</h2></div>';
     h+='<div class="import" id="painelImport">';
@@ -776,10 +771,7 @@
     h+='<div class="field"><label for="nc-cat">Categoria</label><select id="nc-cat">'+CATEGORIAS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>';
     h+='<div class="field"><label for="nc-conta">Cartão</label><select id="nc-conta">'+cartoes.map(function(c){return '<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>';}).join('')+'</select></div>';
     h+='<div class="field"><label for="nc-val">Valor</label><input id="nc-val" class="w-val" placeholder="R$ 0,00"></div>';
-    h+='<div class="field"><label for="nc-patual">Parcela</label><input id="nc-patual" style="width:52px;text-align:center" placeholder="1"></div>';
-    h+='<div class="field"><label for="nc-ptotal">de quantas</label><input id="nc-ptotal" style="width:52px;text-align:center" placeholder="1"></div>';
     h+='<button class="addbtn" data-act="add-cartao">Lançar</button></div>';
-    h+='<div class="sec-note">Se for uma compra parcelada, preencha “Parcela” e “de quantas” — as próximas parcelas são lançadas sozinhas nos meses seguintes.</div>';
     h+='</section>';
 
     cartoes.forEach(function(c){
@@ -1127,13 +1119,7 @@
       if(!descC||!vlC){ toast('Preencha a descrição e o valor.'); return; }
       var dataC=document.getElementById('nc-data').value||mesId+'-01';
       var catC=document.getElementById('nc-cat').value, contaC=document.getElementById('nc-conta').value;
-      var patual=parseInt(document.getElementById('nc-patual').value,10)||0;
-      var ptotal=parseInt(document.getElementById('nc-ptotal').value,10)||0;
       var pc=detectaParcela(descC);
-      if(!pc && ptotal>1 && patual>=1 && patual<=ptotal){
-        pc={atual:patual,total:ptotal};
-        descC=nomeSemParcela(descC)+' ('+patual+'/'+ptotal+')';
-      }
       mes.lancamentos.push({id:uid(),data:dataC,descricao:descC,categoria:catC,valor:vlC,conta:contaC,parcelado:!!pc});
       await salvar();
       if(pc) await propagarParcelas({data:dataC,categoria:catC,valor:vlC,conta:contaC,descricao:descC},pc);
@@ -1198,14 +1184,6 @@
         ff.pagas=act==='pagar-parcela'?Math.min((+ff.pagas||0)+1,+ff.total||0):Math.max((+ff.pagas||0)-1,0);
         await sset(KEY_FIN,financ); render();
       }
-      return;
-    }
-    if(act==='replicar-parcelas'){
-      var r=await replicarParcelasExistentes();
-      render();
-      if(!r.itens) toast('Nenhuma compra parcelada com parcelas em aberto neste mês.');
-      else if(!r.criadas) toast('As parcelas já estavam lançadas nos próximos meses.');
-      else toast(r.criadas+(r.criadas===1?' parcela lançada':' parcelas lançadas')+' nos meses seguintes.');
       return;
     }
     if(act==='export-jobs'){ exportarJobs(); return; }
