@@ -214,44 +214,74 @@
   .fin-linha{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;color:var(--muted);padding:2px 0}
   .fin-linha span:first-child{color:var(--ink)}
 
+  .tabela-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px}
+  .tabela-scroll table{min-width:560px}
+
   @media (max-width:620px){
     .hero-num{font-size:40px}
     .wrap{padding:0 14px}
     .mesnav h1{font-size:20px;min-width:140px}
-    .w-val{width:106px}
+    #app .w-val{width:106px}
     .hide-sm{display:none}
     section{padding:18px 16px 16px;border-radius:var(--radius-md)}
     .hero{padding:22px 18px 20px;border-radius:var(--radius-md)}
+    .hero-grid{gap:14px 22px}
     .aba{padding:8px 13px;font-size:13px}
     .barras{height:150px;gap:3px}
     .barra-val{font-size:10px}
     .barra-rot{font-size:10px}
+    .topbar{padding:16px 0 12px}
+    .destino,.import{padding:16px}
+  }
+  @media (max-width:480px){
+    .adder .field,.dest-row .field{flex:1 1 100%}
+    .adder .field input,.adder .field select,.dest-row .field input{width:100%}
+    #app .w-val{width:100%}
+    .cartao-box{min-width:100%}
+    .tipo-bloco{min-width:100%}
   }
   @media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
 </style>
 
 <script>
 (function(){
-  // Fora do Claude.ai, window.storage não existe — este bloco recria a
-  // mesma interface usando localStorage do navegador. Os dados ficam
-  // presos a este navegador/dispositivo específico (não sincronizam
-  // entre aparelhos).
+  // window.storage agora fala com a API da Vercel (/api/kv), que guarda
+  // tudo num banco Postgres — os dados deixam de ficar presos a um
+  // navegador/aparelho específico. Se a sessão de login expirar, as
+  // chamadas voltam 401 e a gente aciona window.__onUnauthorized (definida
+  // no script principal) pra mostrar a tela de senha de novo.
+  function semAuth(){
+    if(window.__onUnauthorized) window.__onUnauthorized();
+    var e=new Error('unauthorized'); e.unauthorized=true; throw e;
+  }
   window.storage = {
     get: async function(k){
-      var v = localStorage.getItem(k);
-      if(v===null){ var e=new Error('not found'); throw e; }
+      var resp=await fetch('/api/kv?key='+encodeURIComponent(k));
+      if(resp.status===401) semAuth();
+      if(!resp.ok){ var e=new Error('not found'); throw e; }
+      var data=await resp.json();
+      return {key:data.key, value:data.value};
+    },
+    set: async function(k,v){
+      var resp=await fetch('/api/kv?key='+encodeURIComponent(k),{
+        method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({value:v})
+      });
+      if(resp.status===401) semAuth();
+      if(!resp.ok) return null;
       return {key:k, value:v};
     },
-    set: async function(k,v){ localStorage.setItem(k,v); return {key:k, value:v}; },
     list: async function(prefix){
-      var keys=[];
-      for(var i=0;i<localStorage.length;i++){
-        var k=localStorage.key(i);
-        if(!prefix || k.indexOf(prefix)===0) keys.push(k);
-      }
-      return {keys:keys};
+      var resp=await fetch('/api/kv?prefix='+encodeURIComponent(prefix||''));
+      if(resp.status===401) semAuth();
+      if(!resp.ok) return {keys:[]};
+      var data=await resp.json();
+      return {keys:data.keys||[]};
     },
-    delete: async function(k){ localStorage.removeItem(k); return {key:k, deleted:true}; }
+    delete: async function(k){
+      var resp=await fetch('/api/kv?key='+encodeURIComponent(k),{method:'DELETE'});
+      if(resp.status===401) semAuth();
+      return {key:k, deleted:true};
+    }
   };
 })();
 </script>
@@ -646,7 +676,7 @@
       lista=lista.slice().sort(function(a,b){
         return (ordemTipo[tipoJob(a)]-ordemTipo[tipoJob(b)]) || (a.data||'').localeCompare(b.data||'') || a.cliente.localeCompare(b.cliente);
       });
-      h+='<table><thead><tr><th style="width:64px">Data</th><th>Cliente / job</th><th class="r">Orçamento</th><th class="r">Recebido</th><th class="r">Falta receber</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
+      h+='<div class="tabela-scroll"><table><thead><tr><th style="width:64px">Data</th><th>Cliente / job</th><th class="r">Orçamento</th><th class="r">Recebido</th><th class="r">Falta receber</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
       var totOrc=0,totRec=0,totFal=0;
       lista.forEach(function(j){
         var st=statusJob(j), ab=abertoJob(j);
@@ -665,7 +695,7 @@
       h+='<td class="r val" style="font-weight:700;color:var(--green)">'+money(totRec)+'</td>';
       h+='<td class="r val" style="font-weight:700;color:var(--azul)">'+money(totFal)+'</td>';
       h+='<td></td><td></td></tr></tfoot>';
-      h+='</table>';
+      h+='</table></div>';
       h+='<div class="sec-note">Preencha “Recebido” conforme o cliente for pagando — não precisa ser tudo de uma vez, o valor fica somado até completar o orçamento.</div>';
     }
     h+='</section>';
@@ -928,6 +958,7 @@
     h+='<button class="toolbtn" data-act="export-backup">Baixar backup completo</button>';
     h+='<button class="toolbtn" data-act="import-backup">Importar backup</button>';
     h+='<button class="toolbtn" data-act="reset">Recomeçar do zero</button>';
+    h+='<button class="toolbtn" data-act="sair">Sair</button>';
     h+='</div></div>';
 
     var semEntrada=!m.entradas.length&&!+m.repasse&&!jobsDoMes(mesId).length;
@@ -1119,11 +1150,9 @@
     try{
       var texto=await file.text();
       var bundle=JSON.parse(texto);
-      var n=0;
-      for(var k in bundle){
-        if(Object.prototype.hasOwnProperty.call(bundle,k)){ localStorage.setItem(k,bundle[k]); n++; }
-      }
-      toast('Backup importado — '+n+' itens. Recarregando…');
+      var chaves=Object.keys(bundle);
+      for(var i=0;i<chaves.length;i++){ await window.storage.set(chaves[i],bundle[chaves[i]]); }
+      toast('Backup importado — '+chaves.length+' itens. Recarregando…');
       setTimeout(function(){ location.reload(); },1200);
     }catch(e){
       toast('Não consegui ler esse arquivo de backup.');
@@ -1298,6 +1327,7 @@
       try{ await window.storage.delete(KEY_CFG); }catch(e){}
       await iniciar(true); return;
     }
+    if(act==='sair'){ await window.__sairApp(); return; }
   });
 
   document.addEventListener('change',async function(ev){
@@ -1395,9 +1425,32 @@
     if(alvo){ alvo.valor=15000; await sset(KEY_JOBS,jobs); }
     await sset('fin:jobs_fix_mar',true);
   }
+  // versão antiga guardava tudo em localStorage; se ainda houver dados
+  // aqui neste navegador e o servidor estiver vazio, migra pra API uma
+  // única vez em vez de simplesmente semear do zero.
+  async function migrarLocalParaServidor(){
+    var chaves=[];
+    try{
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k&&k.indexOf('fin:')===0) chaves.push(k);
+      }
+    }catch(e){ return false; }
+    if(!chaves.length) return false;
+    for(var j=0;j<chaves.length;j++){
+      await window.storage.set(chaves[j],localStorage.getItem(chaves[j]));
+    }
+    chaves.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+    return true;
+  }
+
   async function iniciar(forcar){
     cfg=forcar?null:await sget(KEY_CFG);
     if(cfg&&cfg.versao!==VERSAO) cfg=null;
+    if(!cfg&&!forcar){
+      var migrou=await migrarLocalParaServidor();
+      if(migrou){ cfg=await sget(KEY_CFG); if(cfg&&cfg.versao!==VERSAO) cfg=null; }
+    }
     if(!cfg){
       var antigos=await slist('fin:mes:');
       for(var j=0;j<antigos.length;j++){ try{ await window.storage.delete(antigos[j]); }catch(e){} }
@@ -1418,9 +1471,53 @@
     render();
   }
 
-  iniciar(false).catch(function(e){
+  function erroBoot(){
     document.getElementById('app').innerHTML='<div class="wrap"><p class="boot">Não consegui abrir o armazenamento. Recarregue a página para tentar de novo.</p></div>';
-  });
+  }
+
+  function telaLogin(msgErro){
+    document.getElementById('app').innerHTML=
+      '<div class="wrap" style="max-width:360px;padding-top:80px">'+
+      '<h1 style="font-family:var(--serif);font-size:22px;margin:0 0 4px">Controle financeiro</h1>'+
+      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 18px">Digite a senha para continuar.</p>'+
+      (msgErro?'<div class="erro">'+esc(msgErro)+'</div>':'')+
+      '<div class="field" style="margin-bottom:12px"><input type="password" id="login-senha" placeholder="Senha" style="width:100%;height:40px"></div>'+
+      '<button class="addbtn" id="login-btn" style="width:100%">Entrar</button>'+
+      '</div>';
+    var campo=document.getElementById('login-senha');
+    campo.focus();
+    campo.addEventListener('keydown',function(e){ if(e.key==='Enter') tentarLogin(); });
+    document.getElementById('login-btn').addEventListener('click',tentarLogin);
+  }
+
+  async function tentarLogin(){
+    var campo=document.getElementById('login-senha');
+    var senha=campo?campo.value:'';
+    var btn=document.getElementById('login-btn');
+    if(btn){ btn.disabled=true; btn.textContent='Entrando…'; }
+    try{
+      var resp=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({senha:senha})});
+      if(resp.ok){ iniciar(false).catch(erroBoot); }
+      else{ telaLogin('Senha incorreta.'); }
+    }catch(e){
+      telaLogin('Não consegui falar com o servidor. Tente de novo.');
+    }
+  }
+
+  async function sair(){
+    try{ await fetch('/api/logout',{method:'POST'}); }catch(e){}
+    location.reload();
+  }
+  window.__sairApp=sair;
+  window.__onUnauthorized=function(){ telaLogin(); };
+
+  (async function(){
+    try{
+      var resp=await fetch('/api/session');
+      if(resp.ok) await iniciar(false);
+      else telaLogin();
+    }catch(e){ erroBoot(); }
+  })().catch(erroBoot);
 })();
 </script>
 

@@ -1,50 +1,41 @@
 # Controle financeiro — deploy na Vercel
 
-## O que muda em relação à versão do Claude.ai
+## Arquitetura
 
-- **Armazenamento**: os dados agora ficam salvos no `localStorage` do
-  navegador, não mais no armazenamento do Claude.ai. Isso significa que
-  os dados ficam presos àquele navegador/aparelho específico — abrir o
-  site no celular não mostra o que você lançou no computador. Não há
-  sincronização entre dispositivos nesta versão.
-- **Leitura de print/texto**: a chamada para a IA passou a ir por uma
-  função própria (`/api/read-receipt`), que roda no servidor da Vercel e
-  guarda sua chave de API em uma variável de ambiente — ela nunca fica
-  exposta no navegador.
+- **Armazenamento**: os dados ficam num banco **Postgres** (Vercel
+  Postgres / Neon), acessado por uma API própria (`/api/kv`). Isso
+  substitui a versão anterior, que guardava tudo no `localStorage` do
+  navegador — agora os dados sincronizam entre celular e computador,
+  porque o servidor é a fonte única de verdade.
+- **Login**: como os dados agora vivem num servidor de verdade (e não
+  presos ao seu navegador), o app pede uma senha antes de abrir
+  (`/api/login`). A sessão fica guardada num cookie por 60 dias.
+- **Leitura de print/texto**: a chamada para a IA vai por uma função
+  própria (`/api/read-receipt`), que roda no servidor da Vercel e guarda
+  sua chave de API em uma variável de ambiente — ela nunca fica exposta
+  no navegador. Essa rota também exige login.
 
-## Atenção: o site fica público
+## Migrando os dados que você já tinha no navegador
 
-Um deploy comum da Vercel gera uma URL pública. Qualquer pessoa com o
-link consegue abrir o app e ver seus dados financeiros — não existe
-login nem senha nesta versão. Se isso for um problema, duas opções:
+Se você já usava a versão com `localStorage`, não precisa fazer nada na
+mão: na primeira vez que abrir o site novo (depois de configurar tudo
+abaixo) **naquele mesmo navegador**, o app detecta os dados antigos
+sozinho e sobe tudo pro banco automaticamente, apagando a cópia local
+em seguida. Só funciona uma vez e só no navegador onde os dados
+estavam — se você usa o site em mais de um aparelho, faça isso primeiro
+no que tem os dados mais completos/recentes.
 
-- Ativar a **Proteção por senha** da Vercel (Project Settings → Deployment
-  Protection), disponível nos planos pagos.
-- Me pedir para adicionar uma tela de senha simples ao próprio app (mais
-  trabalhoso, mas funciona em qualquer plano).
-
-## Migrando os dados que você já tem no Claude.ai
-
-1. No chat do Claude.ai, no app atual, clique em **"Baixar backup completo"**
-   (fica ao lado de "Baixar em CSV"). Isso baixa um arquivo
-   `backup-financas-AAAA-MM.json` com tudo: meses, jobs, financiamentos,
-   configurações de cartão.
-2. Depois de publicado na Vercel (passo 3 abaixo), abra o site e clique
-   em **"Importar backup"**. Escolha o arquivo que você acabou de baixar.
-3. A página recarrega sozinha com os dados já lá dentro.
-
-Pode repetir esse processo depois, se quiser levar lançamentos mais
-recentes do Claude.ai para o site — mas repare que importar um backup
-**sobrescreve** os dados que já existirem no site com o mesmo nome (por
-exemplo, se você já tiver lançado gastos de setembro no site e importar
-um backup antigo, o setembro do site volta para o que estava no backup).
+Se preferir fazer isso na mão (ou vier direto do Claude.ai), use os
+mesmos botões de sempre: **"Baixar backup completo"** no aparelho de
+origem e **"Importar backup"** no site novo — a importação agora grava
+direto no banco.
 
 ## Passo a passo
 
 ### 1. Criar uma conta na Anthropic Console e gerar uma chave de API
 Acesse https://console.anthropic.com, crie uma chave em **API Keys**.
 Isso é separado da sua conta do Claude.ai — o uso da API é cobrado à
-parte, por token. Guarde essa chave, você vai usá-la no passo 4.
+parte, por token. Guarde essa chave, você vai usá-la no passo 5.
 
 ### 2. Subir os arquivos para o GitHub
 Crie um repositório novo (pode ser privado) e suba esta pasta inteira:
@@ -54,30 +45,58 @@ controle-financeiro/
 ├── index.html
 ├── package.json
 ├── README.md
+├── .gitignore
 └── api/
+    ├── _auth.js
+    ├── kv.js
+    ├── login.js
+    ├── logout.js
+    ├── session.js
     └── read-receipt.js
 ```
 
-Pelo site do GitHub: crie o repositório, clique em "uploading an existing
-file" e arraste os quatro itens acima.
+Pelo site do GitHub: crie o repositório, clique em "uploading an
+existing file" e arraste os itens acima (a pasta `api` inteira).
 
 ### 3. Conectar o repositório à Vercel
 Em https://vercel.com, entre com sua conta do GitHub, clique em **Add
 New → Project**, selecione o repositório que você acabou de criar e
-clique em **Deploy**. Não precisa mudar nenhuma configuração de build.
+clique em **Deploy**. Não precisa mudar nenhuma configuração de build
+— a Vercel instala a dependência (`@vercel/postgres`) sozinha.
 
-### 4. Configurar a chave de API
-Depois do primeiro deploy (ele vai falhar ao ler prints até este passo):
-**Project Settings → Environment Variables** → adicione uma variável
-chamada `ANTHROPIC_API_KEY` com o valor da chave do passo 1. Depois vá
-em **Deployments**, abra o menu "⋯" do último deploy e clique em
-**Redeploy** para a variável entrar em vigor.
+O primeiro deploy vai subir, mas o app ainda não vai funcionar (falta o
+banco e as senhas dos passos seguintes).
 
-### 5. Pronto
+### 4. Criar o banco de dados
+No painel do projeto na Vercel, vá em **Storage → Create Database →
+Postgres** (ou "Neon", é a mesma oferta). Siga o assistente e conecte o
+banco a este projeto — a Vercel mesma já configura as variáveis de
+ambiente do banco (`POSTGRES_URL` e afins) sozinha. A tabela usada pelo
+app (`kv`) é criada automaticamente na primeira chamada à API, não
+precisa rodar nada manualmente.
+
+### 5. Configurar as variáveis de ambiente
+Em **Project Settings → Environment Variables**, adicione:
+
+- `ANTHROPIC_API_KEY` — a chave do passo 1 (pra leitura de print/texto).
+- `APP_PASSWORD` — a senha que você (e quem mais usar o app) vai digitar
+  pra entrar. Escolha algo só seu, não precisa ser complexo.
+- `SESSION_SECRET` — uma string aleatória qualquer, só pra assinar o
+  cookie de sessão (por exemplo, gere uma em
+  https://1password.com/password-generator ou rode `openssl rand -hex 32`
+  no terminal). Não precisa decorar nem reusar em outro lugar.
+
+Depois de salvar as três, vá em **Deployments**, abra o menu "⋯" do
+último deploy e clique em **Redeploy** para elas entrarem em vigor.
+
+### 6. Pronto
 A Vercel te dá uma URL do tipo `controle-financeiro-xxxx.vercel.app`.
-Esse link é o app. Salve nos favoritos ou na tela inicial do celular.
+Abra, digite a senha do `APP_PASSWORD` e o app carrega — migrando os
+dados antigos do navegador automaticamente, se houver (veja a seção
+acima). Salve o link nos favoritos ou na tela inicial do celular.
 
-## Se quiser sincronizar entre dispositivos no futuro
-Isso exigiria trocar o `localStorage` por um banco de dados real (a
-própria Vercel tem opções como Vercel KV ou Postgres) e adicionar login.
-É uma mudança maior — me avise se quiser seguir por esse caminho.
+## Se mais de uma pessoa vai usar
+Hoje é uma senha única compartilhada (dá pra você e a Heloísa usarem o
+mesmo login, por exemplo). Se no futuro quiser contas separadas por
+pessoa, é uma mudança maior — me avise se quiser seguir por esse
+caminho.

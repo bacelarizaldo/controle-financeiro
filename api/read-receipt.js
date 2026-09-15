@@ -2,8 +2,10 @@
 // Recebe o conteúdo (imagem/texto) que o app monta no cliente e repassa
 // para a API da Anthropic usando a chave guardada em variável de ambiente.
 // A chave NUNCA é exposta ao navegador.
+const { exigirAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
+  if (!exigirAuth(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método não permitido' });
     return;
