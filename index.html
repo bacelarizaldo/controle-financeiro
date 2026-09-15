@@ -266,18 +266,20 @@
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
-  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Pessoal','Impostos','Serviços','Lazer','Educação','Vestuário','Pets','Outros'];
-  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Lazer':'#B0763F','Educação':'#3F8F8C','Vestuário':'#B0507A','Pets':'#5C8F3F','Outros':'#5E6B6B'};
+  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Pessoal','Impostos','Serviços','Lazer','Educação','Cursos','Vestuário','Compras','Pets','Outros'];
+  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Lazer':'#B0763F','Educação':'#3F8F8C','Cursos':'#2E7D8C','Vestuário':'#B0507A','Compras':'#6B4FA0','Pets':'#5C8F3F','Outros':'#5E6B6B'};
   function corCat(c){ return CORES_CAT[c]||'#5E6B6B'; }
 
   var REGRAS_CATEGORIA=[
+    ['Compras',/mercado\s*livre|amazon|shopee|aliexpress|shein|magalu|magazine luiza|shopping\b|marketplace/i],
     ['Alimentação',/ifood|rappi|uber\s*eats|restaurante|lanchonete|padaria|a[cç]ougue|hortifruti|mercado|supermercado|feira|pizza|burger|mc\s*donald|habib|subway/i],
     ['Transporte',/uber|99app|99\s*pop|posto\b|combust[íi]vel|gasolina|etanol|estacionamento|ped[áa]gio|metr[oô]|[ôo]nibus|passagem a[ée]rea|localiza|movida/i],
     ['Saúde',/farm[áa]cia|drogaria|drogasil|pacheco|clínica|cl[ií]nica|hospital|laborat[oó]rio|exame|dentista|academia\b/i],
     ['Vestuário',/renner|riachuelo|c&a|zara|calçado|cal[çc]ados|marisa|hering|sapataria/i],
     ['Pets',/petz|cobasi|pet\s*shop|veterin[áa]rio|ra[çc][ãa]o/i],
     ['Lazer',/cinema|ingresso|show\b|balada|parque|airbnb|booking\.com|hotel|pousada|bar\b|choperia/i],
-    ['Educação',/faculdade|universidade|curso\b|udemy|alura|mensalidade escolar|material escolar/i],
+    ['Cursos',/curso\b|udemy|alura|hotmart|bootcamp|workshop|treinamento/i],
+    ['Educação',/faculdade|universidade|mensalidade escolar|material escolar/i],
     ['Serviços',/netflix|spotify|amazon prime|hbo|disney\+|claro|vivo\b|tim\b|assinatura|internet\b|celular\b/i],
     ['Impostos',/\bdas\b|imposto|irpf|inss|inpi|iptu|ipva/i],
     ['Moradia',/aluguel|condom[íi]nio|energia\b|luz\b|[áa]gua\b|g[áa]s\b/i]
@@ -648,6 +650,9 @@
     var m=mes, idx=meses.indexOf(mesId);
     var cartoes=cfg.contas.filter(function(c){return c.tipo==='cartao';});
     var totMes=cartoes.reduce(function(a,c){return a+totConta(m,c.id);},0);
+    var lancCartaoMes=m.lancamentos.filter(function(l){return tipoConta(l.conta)==='cartao';});
+    var totParceladoMes=lancCartaoMes.filter(function(l){return !!l.parcelado;}).reduce(function(a,l){return a+(+l.valor||0);},0);
+    var totAvulsoMes=lancCartaoMes.filter(function(l){return !l.parcelado;}).reduce(function(a,l){return a+(+l.valor||0);},0);
     var h='';
 
     h+='<div class="topbar"><div class="mesnav">';
@@ -661,6 +666,8 @@
     h+='<div class="hero-sub">Já contado nas saídas do mês — este painel é só para separar o que é parcela do que é compra do mês.</div>';
     h+='<div class="hero-grid">';
     cartoes.forEach(function(c){ h+='<div class="hero-cell"><span>'+esc(c.nome)+'</span><b>'+money(totConta(m,c.id))+'</b></div>'; });
+    h+='<div class="hero-cell"><span>Parcelado</span><b>'+money(totParceladoMes)+'</b></div>';
+    h+='<div class="hero-cell"><span>Compras do mês</span><b>'+money(totAvulsoMes)+'</b></div>';
     h+='</div></div>';
 
     h+='<section><div class="sec-head"><h2>Lançar pelo texto</h2></div>';
@@ -824,6 +831,20 @@
     h+='<div class="field"><label for="nf-val">Valor</label><input id="nf-val" class="w-val" placeholder="R$ 0,00"></div>';
     h+='<button class="addbtn" data-act="add-fixa">Adicionar conta fixa</button></div>';
     h+='<div class="sec-note">Contas fixas se repetem sozinhas quando você abre o próximo mês, já como “a pagar”.</div></section>';
+
+    // cartões (subgrupo — soma por cartão, detalhe fica na aba Cartões)
+    var cartoesMes=cfg.contas.filter(function(c){return c.tipo==='cartao';});
+    var totCartoesMes=cartoesMes.reduce(function(a,c){return a+totConta(m,c.id);},0);
+    if(cartoesMes.length){
+      h+='<section><div class="sec-head"><h2>Cartões</h2><span class="sec-total">'+money(totCartoesMes)+'</span></div>';
+      h+='<table><tbody>';
+      cartoesMes.forEach(function(c){
+        h+='<tr><td class="nome">'+esc(c.nome)+'</td><td class="r val">'+money(totConta(m,c.id))+'</td>';
+        h+='<td class="r" style="width:34px"><button class="linkjob" data-vista="cartoes" title="Ver no detalhe dos cartões">ver</button></td></tr>';
+      });
+      h+='</tbody></table>';
+      h+='<div class="sec-note">Já contado nas saídas do mês — aqui é só a soma por cartão. O detalhe de cada compra fica na aba Cartões.</div></section>';
+    }
 
     // gastos (dinheiro / pix — os de cartão ficam na aba Cartões)
     var lancsTodos=m.lancamentos.slice().sort(function(a,b){return (b.data||'').localeCompare(a.data||'');});
