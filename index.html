@@ -94,6 +94,9 @@
   th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:8px 8px 6px;border-bottom:1px solid var(--rule-soft)}
   td{padding:7px 8px;border-bottom:1px solid var(--rule-soft);vertical-align:middle}
   tr:last-child td{border-bottom:none}
+  .linha-total td{background:#F3F5EF;padding-top:11px;padding-bottom:11px}
+  .linha-total td:first-child{padding-left:8px}
+  .linha-total td:last-child{padding-right:8px}
   th:first-child,td:first-child{padding-left:0}
   th:last-child,td:last-child{padding-right:0}
   .r{text-align:right}.c{text-align:center}
@@ -641,8 +644,8 @@
         h+='<td class="c"><span class="chip '+st.k+'">'+st.rot+'</span></td>';
         h+='<td class="r" style="width:34px"><button class="del" data-del="job" data-id="'+j.id+'" aria-label="Remover">×</button></td></tr>';
       });
-      h+='</tbody><tfoot><tr style="border-top:1.5px solid var(--ink)">';
-      h+='<td></td><td class="nome">Total</td>';
+      h+='</tbody><tfoot><tr class="linha-total" style="border-top:1.5px solid var(--ink)">';
+      h+='<td></td><td class="nome" style="font-weight:700">Total</td>';
       h+='<td class="r val" style="font-weight:700">'+money(totOrc)+'</td>';
       h+='<td class="r val" style="font-weight:700;color:var(--green)">'+money(totRec)+'</td>';
       h+='<td class="r val" style="font-weight:700;color:var(--azul)">'+money(totFal)+'</td>';
@@ -793,9 +796,10 @@
       h+='<div class="conta-body">';
       h+='<h4>Parcelado ('+money(parc.reduce(function(a,l){return a+l.valor;},0))+')</h4>';
       if(parc.length){
-        h+='<table><tbody>';
+        h+='<table><thead><tr><th style="width:64px">Data</th><th>Descrição</th><th class="hide-sm">Categoria</th><th class="r"></th><th></th></tr></thead><tbody>';
         parc.forEach(function(l){
-          h+='<tr><td class="dim val" style="width:64px">'+esc(dataCurta(l.data))+'</td><td>'+esc(l.descricao)+'<br>'+catSelect('lanc',l.id,l.categoria)+'</td>';
+          h+='<tr><td class="dim val" style="width:64px">'+esc(dataCurta(l.data))+'</td><td>'+esc(l.descricao)+'</td>';
+          h+='<td class="hide-sm">'+catSelect('lanc',l.id,l.categoria)+'</td>';
           h+='<td class="r"><input class="inline-val" data-edit="lanc" data-id="'+l.id+'" value="'+money(l.valor)+'"></td>';
           h+='<td class="r" style="width:30px"><button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></td></tr>';
         });
@@ -805,9 +809,10 @@
       }
       h+='<h4>Compras do mês ('+money(avl.reduce(function(a,l){return a+l.valor;},0))+')</h4>';
       if(avl.length){
-        h+='<table><tbody>';
+        h+='<table><thead><tr><th style="width:64px">Data</th><th>Descrição</th><th class="hide-sm">Categoria</th><th class="r"></th><th></th></tr></thead><tbody>';
         avl.forEach(function(l){
-          h+='<tr><td class="dim val" style="width:64px">'+esc(dataCurta(l.data))+'</td><td>'+esc(l.descricao)+'<br>'+catSelect('lanc',l.id,l.categoria)+'</td>';
+          h+='<tr><td class="dim val" style="width:64px">'+esc(dataCurta(l.data))+'</td><td>'+esc(l.descricao)+'</td>';
+          h+='<td class="hide-sm">'+catSelect('lanc',l.id,l.categoria)+'</td>';
           h+='<td class="r"><input class="inline-val" data-edit="lanc" data-id="'+l.id+'" value="'+money(l.valor)+'"></td>';
           h+='<td class="r" style="width:30px"><button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></td></tr>';
         });
@@ -954,10 +959,11 @@
 
     // contas fixas
     h+='<section><div class="sec-head"><h2>Contas fixas</h2><span class="sec-total">'+money(totFixas(m))+'</span></div>';
-    h+='<table><thead><tr><th>Conta</th><th class="hide-sm">Vencimento</th><th class="r">Valor</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
+    h+='<table><thead><tr><th>Conta</th><th class="hide-sm">Categoria</th><th class="hide-sm">Vencimento</th><th class="r">Valor</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
     m.fixas.slice().sort(function(a,b){return a.dia-b.dia;}).forEach(function(f){
       var st=statusFixa(f), rot=st==='pago'?'Pago':(st==='vencido'?'Venceu':'A pagar');
-      h+='<tr><td><span class="nome">'+esc(f.nome)+'</span><br>'+catSelect('fixa',f.id,f.categoria)+'</td>';
+      h+='<tr><td><span class="nome">'+esc(f.nome)+'</span></td>';
+      h+='<td class="hide-sm">'+catSelect('fixa',f.id,f.categoria)+'</td>';
       h+='<td class="hide-sm venc'+(st==='vencido'?' alerta':'')+'">dia '+f.dia+'</td>';
       h+='<td class="r"><input class="inline-val" data-edit="fixa" data-id="'+f.id+'" value="'+money(f.valor)+'"></td>';
       h+='<td class="c"><button class="chip '+st+'" data-toggle="'+f.id+'">'+rot+'</button></td>';
@@ -1009,10 +1015,11 @@
     if(!vis.length){
       h+='<div class="vazio">'+(lancs.length?'Nada nessa categoria.':'Nenhum gasto em dinheiro ou Pix lançado ainda neste mês.')+'</div>';
     }else{
-      h+='<table><thead><tr><th style="width:66px">Data</th><th>Descrição</th><th class="hide-sm">Pago com</th><th class="r">Valor</th><th></th></tr></thead><tbody>';
+      h+='<table><thead><tr><th style="width:66px">Data</th><th>Descrição</th><th class="hide-sm">Categoria</th><th class="hide-sm">Pago com</th><th class="r">Valor</th><th></th></tr></thead><tbody>';
       vis.forEach(function(l){
         h+='<tr><td class="dim val">'+esc(dataCurta(l.data))+'</td>';
-        h+='<td><span class="nome">'+esc(l.descricao)+'</span><br>'+catSelect('lanc',l.id,l.categoria)+'</td>';
+        h+='<td><span class="nome">'+esc(l.descricao)+'</span></td>';
+        h+='<td class="hide-sm">'+catSelect('lanc',l.id,l.categoria)+'</td>';
         h+='<td class="hide-sm dim">'+esc(nomeConta(l.conta))+'</td>';
         h+='<td class="r"><input class="inline-val" data-edit="lanc" data-id="'+l.id+'" value="'+money(l.valor)+'"></td>';
         h+='<td class="r" style="width:34px"><button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></td></tr>';
