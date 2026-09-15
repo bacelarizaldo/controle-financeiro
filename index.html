@@ -130,11 +130,11 @@
     border:1px solid #414141;
     border-radius:9px;
     background:#222;
-    color:#F2F2F2;
+    color:#F2F2F2 !important;
     font-family:var(--sans);
     font-size:15px;
     outline:none;
-    transition:border-color .15s,box-shadow .15s,background .15s;
+   transition:border-color .15s,box-shadow .15s,background .15s;
   }
   .login-field input::placeholder{color:#888}
   .login-field input:focus{
@@ -1530,7 +1530,7 @@
     document.getElementById('app').innerHTML=
       '<div class="login-screen">'+
         '<div class="login-card">'+
-          '<h1>Login na sua conta</h1>'+
+          '<h1>Financeiro 2026</h1>'+
           '<p class="login-subtitle">Entre com seu usuário abaixo para acessar seu controle financeiro</p>'+
           (msgErro?'<div class="erro login-error">'+esc(msgErro)+'</div>':'')+
           '<div class="login-field">'+
