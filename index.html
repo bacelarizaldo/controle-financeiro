@@ -289,13 +289,18 @@
   }
   function semAcento(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
   var MAPA_CAT_NORM=(function(){ var m={}; CATEGORIAS.forEach(function(c){ m[semAcento(c)]=c; }); return m; })();
+  var RX_SEP_TOKEN=/^[-–—•|,;:]+$/;
+  function limpaToken(t){ return String(t||'').replace(/^[-–—•|,;:()]+/,'').replace(/[-–—•|,;:()]+$/,''); }
   function extraiCategoriaExplicita(l){
     var tokens=l.split(/\s+/);
     for(var i=0;i<tokens.length;i++){
-      var chave=semAcento(tokens[i].replace(/[.,;:()]+$/,''));
+      var chave=semAcento(limpaToken(tokens[i]));
       if(MAPA_CAT_NORM[chave]){
+        var cat=MAPA_CAT_NORM[chave];
         tokens.splice(i,1);
-        return {categoria:MAPA_CAT_NORM[chave], resto:tokens.join(' ').trim()};
+        if(i>0&&RX_SEP_TOKEN.test(tokens[i-1])) tokens.splice(i-1,1);
+        else if(i<tokens.length&&RX_SEP_TOKEN.test(tokens[i])) tokens.splice(i,1);
+        return {categoria:cat, resto:tokens.join(' ').trim()};
       }
     }
     return null;
