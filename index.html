@@ -761,6 +761,7 @@
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
     h+='</div><div class="tools">';
     h+='<button class="toolbtn" data-act="export">Baixar em CSV</button>';
+    h+='<button class="toolbtn" data-act="export-backup">Baixar backup completo</button>';
     h+='<button class="toolbtn" data-act="import-backup">Importar backup</button>';
     h+='<button class="toolbtn" data-act="reset">Recomeçar do zero</button>';
     h+='</div></div>';
@@ -947,6 +948,19 @@
     toast('Faturamento de '+nomeMesCurto(mesId)+' baixado.');
   }
 
+  async function exportarBackup(){
+    var keys=await slist('fin:');
+    var bundle={};
+    for(var i=0;i<keys.length;i++){
+      try{ var r=await window.storage.get(keys[i]); bundle[keys[i]]=r.value; }catch(e){}
+    }
+    var blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='backup-financas-'+hojeId()+'.json'; a.click();
+    toast('Backup baixado — '+keys.length+' itens.');
+  }
+
   async function importarBackup(file){
     try{
       var texto=await file.text();
@@ -1111,6 +1125,7 @@
       return;
     }
     if(act==='export-jobs'){ exportarJobs(); return; }
+    if(act==='export-backup'){ await exportarBackup(); return; }
     if(act==='import-backup'){ document.getElementById('arqBackup').click(); return; }
     if(act==='export'){ exportarCSV(); return; }
     if(act==='reset'){
