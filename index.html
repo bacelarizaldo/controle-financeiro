@@ -10,7 +10,6 @@
 <div id="app">
   <div id="boot" class="boot">Abrindo seu controle…</div>
 </div>
-<input type="file" id="arqPrint" accept="image/*" style="display:none">
 <input type="file" id="arqBackup" accept="application/json" style="display:none">
 
 <style>
@@ -118,17 +117,12 @@
   .ghost:hover{background:#E4E7DF}
   .vazio{padding:16px 0;color:var(--muted);font-size:13.5px}
 
-  /* importação por print */
+  /* importação por texto */
   .import{border:1px solid var(--rule);border-radius:3px;background:#F8F9F5;padding:16px;margin-bottom:6px}
   .import h3{margin:0 0 3px;font-size:14.5px;font-weight:600}
   .import p{margin:0 0 13px;font-size:13px;color:var(--muted);max-width:66ch}
-  .drop{border:1.5px dashed #BDC6BE;border-radius:3px;background:#fff;padding:26px 16px;text-align:center;color:var(--muted);font-size:13.5px;cursor:pointer}
-  .drop:hover,.drop.over{border-color:var(--ink);color:var(--ink);background:#F3F6F0}
-  .drop b{display:block;color:var(--ink);font-size:15px;font-weight:600;margin-bottom:3px}
   .imp-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px}
   textarea{width:100%;min-height:92px;border:1px solid var(--rule);border-radius:2px;padding:9px 10px;background:#fff;resize:vertical;font-size:14px;line-height:1.5}
-  .ou{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;margin:14px 0 12px}
-  .ou::before,.ou::after{content:"";flex:1;height:1px;background:var(--rule)}
   .lendo{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:18px 0}
   .spin{width:15px;height:15px;border:2px solid var(--rule);border-top-color:var(--ink);border-radius:50%;animation:g .7s linear infinite}
   @keyframes g{to{transform:rotate(360deg)}}
@@ -270,11 +264,29 @@
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
-  var imp={carregando:false,erro:null,itens:null,conta:'azul',origem:null};
+  var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
-  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Pessoal','Impostos','Serviços','Outros'];
-  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Outros':'#5E6B6B'};
+  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Pessoal','Impostos','Serviços','Lazer','Educação','Vestuário','Pets','Outros'];
+  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Lazer':'#B0763F','Educação':'#3F8F8C','Vestuário':'#B0507A','Pets':'#5C8F3F','Outros':'#5E6B6B'};
   function corCat(c){ return CORES_CAT[c]||'#5E6B6B'; }
+
+  var REGRAS_CATEGORIA=[
+    ['Alimentação',/ifood|rappi|uber\s*eats|restaurante|lanchonete|padaria|a[cç]ougue|hortifruti|mercado|supermercado|feira|pizza|burger|mc\s*donald|habib|subway/i],
+    ['Transporte',/uber|99app|99\s*pop|posto\b|combust[íi]vel|gasolina|etanol|estacionamento|ped[áa]gio|metr[oô]|[ôo]nibus|passagem a[ée]rea|localiza|movida/i],
+    ['Saúde',/farm[áa]cia|drogaria|drogasil|pacheco|clínica|cl[ií]nica|hospital|laborat[oó]rio|exame|dentista|academia\b/i],
+    ['Vestuário',/renner|riachuelo|c&a|zara|calçado|cal[çc]ados|marisa|hering|sapataria/i],
+    ['Pets',/petz|cobasi|pet\s*shop|veterin[áa]rio|ra[çc][ãa]o/i],
+    ['Lazer',/cinema|ingresso|show\b|balada|parque|airbnb|booking\.com|hotel|pousada|bar\b|choperia/i],
+    ['Educação',/faculdade|universidade|curso\b|udemy|alura|mensalidade escolar|material escolar/i],
+    ['Serviços',/netflix|spotify|amazon prime|hbo|disney\+|claro|vivo\b|tim\b|assinatura|internet\b|celular\b/i],
+    ['Impostos',/\bdas\b|imposto|irpf|inss|inpi|iptu|ipva/i],
+    ['Moradia',/aluguel|condom[íi]nio|energia\b|luz\b|[áa]gua\b|g[áa]s\b/i]
+  ];
+  function categoriaAuto(desc){
+    var d=String(desc||'');
+    for(var i=0;i<REGRAS_CATEGORIA.length;i++){ if(REGRAS_CATEGORIA[i][1].test(d)) return REGRAS_CATEGORIA[i][0]; }
+    return 'Outros';
+  }
 
   function cfgSemente(){
     return {
@@ -335,19 +347,16 @@
     return mesId+'-01';
   }
 
-  // ---------- leitura de print / texto ----------
+  // ---------- leitura de texto colado ----------
   function promptExtracao(){
-    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira (print de app ou texto colado).\n'+
+    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, colado como texto.\n'+
       'Extraia SOMENTE os gastos (débitos/compras). Ignore pagamentos de fatura, estornos, créditos, saldos, limites, totais da fatura e qualquer linha que não seja uma compra.\n'+
-      'Para cada gasto devolva: data (formato AAAA-MM-DD; se o print não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+').\n'+
+      'Para cada gasto devolva: data (formato AAAA-MM-DD; se o texto não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (a que melhor descreve o gasto pelo nome do estabelecimento, escolhendo exatamente uma de: '+CATEGORIAS.join(', ')+').\n'+
       'Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown, sem crase. Exemplo: [{"data":"2026-08-12","descricao":"Posto Shell","valor":180.5,"categoria":"Transporte"}]';
   }
 
-  async function lerComIA(imagem,mime,texto){
-    var content=[];
-    if(imagem) content.push({type:'image',source:{type:'base64',media_type:mime,data:imagem}});
-    if(texto) content.push({type:'text',text:'Extrato colado:\n'+texto});
-    content.push({type:'text',text:promptExtracao()});
+  async function lerComIA(texto){
+    var content=[{type:'text',text:'Extrato colado:\n'+texto},{type:'text',text:promptExtracao()}];
     var resp=await fetch('/api/read-receipt',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({content:content})
@@ -369,7 +378,7 @@
     texto.split(/\n+/).forEach(function(linha){
       var l=linha.trim(); if(!l) return;
       if(NAO_GASTO.test(l)) return;
-      var mv=l.match(/(-?\s*R?\$?\s*\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})\s*$/);
+      var mv=l.match(/(-?\s*(?:R\$)?\s*\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})\s*$/);
       if(!mv) return;
       var valor=parseNum(mv[1]); if(!valor) return;
       var resto=l.slice(0,l.length-mv[0].length).trim();
@@ -382,7 +391,7 @@
       }
       resto=resto.replace(/^[\-–•|,;]+/,'').trim();
       if(!resto) resto='Gasto';
-      out.push({data:data,descricao:resto,valor:Math.abs(valor),categoria:'Outros'});
+      out.push({data:data,descricao:resto,valor:Math.abs(valor),categoria:categoriaAuto(resto)});
     });
     return out;
   }
@@ -400,55 +409,25 @@
     return arr.map(function(x){
       var d=String(x.data||'').slice(0,10);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) d=mesId+'-01';
-      var cat=CATEGORIAS.indexOf(x.categoria)>-1?x.categoria:'Outros';
       var desc=String(x.descricao||'Gasto').slice(0,80);
+      var cat=CATEGORIAS.indexOf(x.categoria)>-1?x.categoria:categoriaAuto(desc);
       var pc=detectaParcela(desc);
       return {tid:uid(),data:d,descricao:desc,valor:Math.abs(+x.valor||0),categoria:cat,usar:true,parcelado:!!pc,parcelaInfo:pc?(pc.atual+'/'+pc.total):''};
     }).filter(function(x){ return x.valor>0; });
   }
 
-  async function processar(imagem,mime,texto,origem){
-    imp.carregando=true; imp.erro=null; imp.itens=null; imp.origem=origem; render();
+  async function processar(texto){
+    imp.carregando=true; imp.erro=null; imp.itens=null; render();
     try{
-      var arr=await lerComIA(imagem,mime,texto);
+      var arr=await lerComIA(texto);
       imp.itens=normalizar(arr);
-      if(!imp.itens.length) imp.erro='Não encontrei nenhum gasto aqui. Tente um print com a lista de compras visível.';
+      if(!imp.itens.length) imp.erro='Não encontrei nenhum gasto nesse texto.';
     }catch(e){
-      if(texto){
-        var loc=normalizar(lerTextoLocal(texto));
-        if(loc.length){ imp.itens=loc; imp.erro='Li o texto sem a ajuda da IA, então as categorias vieram como “Outros”. Confira antes de lançar.'; }
-        else imp.erro='Não consegui entender esse texto. Cada linha precisa terminar com o valor.';
-      }else{
-        imp.erro='Não consegui ler o print. Tente de novo ou cole o texto dos gastos no campo abaixo.';
-      }
+      var loc=normalizar(lerTextoLocal(texto));
+      if(loc.length){ imp.itens=loc; imp.erro='Li o texto sem a ajuda da IA, então as categorias foram um chute a partir do nome. Confira antes de lançar.'; }
+      else imp.erro='Não consegui entender esse texto. Cada linha precisa terminar com o valor.';
     }
     imp.carregando=false; render();
-  }
-
-  function reduzirImagem(file){
-    return new Promise(function(res,rej){
-      var fr=new FileReader();
-      fr.onerror=function(){ rej(new Error('leitura')); };
-      fr.onload=function(){
-        var img=new Image();
-        img.onerror=function(){ rej(new Error('imagem')); };
-        img.onload=function(){
-          var max=1400, w=img.width, h=img.height;
-          if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
-          var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-          cv.getContext('2d').drawImage(img,0,0,w,h);
-          res({data:cv.toDataURL('image/jpeg',0.85).split(',')[1],mime:'image/jpeg'});
-        };
-        img.src=fr.result;
-      };
-      fr.readAsDataURL(file);
-    });
-  }
-
-  async function receberArquivo(file){
-    if(!file||!/^image\//.test(file.type)){ toast('Envie uma imagem (print da tela).'); return; }
-    try{ var r=await reduzirImagem(file); await processar(r.data,r.mime,null,'print'); }
-    catch(e){ imp.erro='Não consegui abrir essa imagem.'; render(); }
   }
 
   var TIPOS=[{id:'recorrente',rot:'Recorrente'},{id:'avulso',rot:'Avulso'},{id:'freela',rot:'Freela'}];
@@ -663,20 +642,18 @@
     cartoes.forEach(function(c){ h+='<div class="hero-cell"><span>'+esc(c.nome)+'</span><b>'+money(totConta(m,c.id))+'</b></div>'; });
     h+='</div></div>';
 
-    h+='<section><div class="sec-head"><h2>Lançar pelo print ou texto</h2></div>';
+    h+='<section><div class="sec-head"><h2>Lançar pelo texto</h2></div>';
     h+='<div class="import" id="painelImport">';
-    h+='<p>Abra a fatura no celular, tire o print e solte aqui. Compras com parcela tipo “2/6” são detectadas sozinhas — você só confere.</p>';
+    h+='<p>Copie os lançamentos da fatura (do app do banco ou de um extrato) e cole abaixo. A categoria é identificada automaticamente pelo nome do estabelecimento e compras com parcela tipo “2/6” são detectadas sozinhas — você só confere.</p>';
     h+='<div class="imp-row"><div class="field"><label for="imp-conta">Esses gastos são do</label><select id="imp-conta">';
     cartoes.forEach(function(c){ h+='<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>'; });
     h+='</select></div></div>';
 
     if(imp.carregando){
-      h+='<div class="lendo"><div class="spin"></div>Lendo '+(imp.origem==='print'?'o print':'o texto')+'…</div>';
+      h+='<div class="lendo"><div class="spin"></div>Lendo o texto…</div>';
     }else{
       if(imp.erro) h+='<div class="erro">'+esc(imp.erro)+'</div>';
       if(!imp.itens){
-        h+='<div class="drop" id="drop"><b>Solte o print aqui</b>ou clique para escolher a imagem — dá para colar com Ctrl+V também</div>';
-        h+='<div class="ou">ou cole o texto dos gastos</div>';
         h+='<textarea id="imp-texto" placeholder="12/08  IFOOD  47,90&#10;13/08  AMAZON (2/6)  1.299,00"></textarea>';
         h+='<div class="rev-acoes"><button class="addbtn" data-act="ler-texto">Ler texto</button></div>';
       }
@@ -876,38 +853,12 @@
     h+= vista==='jobs' ? viewJobs() : (vista==='cartoes' ? viewCartoes() : (vista==='financ' ? viewFinanc() : viewMes()));
     h+='<div class="rodape">Seus dados ficam salvos só para você e continuam aqui quando voltar. Ainda assim, baixe o CSV de vez em quando — é o seu backup.</div></div>';
     document.getElementById('app').innerHTML=h;
-    ligarDrop();
   }
-
-  function ligarDrop(){
-    var d=document.getElementById('drop'); if(!d) return;
-    d.addEventListener('click',function(){ document.getElementById('arqPrint').click(); });
-    ['dragenter','dragover'].forEach(function(ev){ d.addEventListener(ev,function(e){ e.preventDefault(); d.classList.add('over'); }); });
-    ['dragleave','drop'].forEach(function(ev){ d.addEventListener(ev,function(e){ e.preventDefault(); d.classList.remove('over'); }); });
-    d.addEventListener('drop',function(e){
-      var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
-      if(f) receberArquivo(f);
-    });
-  }
-
-  var inputArq=document.getElementById('arqPrint');
-  inputArq.addEventListener('change',function(){ if(inputArq.files&&inputArq.files[0]) receberArquivo(inputArq.files[0]); inputArq.value=''; });
 
   var inputBackup=document.getElementById('arqBackup');
   inputBackup.addEventListener('change',function(){
     if(inputBackup.files&&inputBackup.files[0]) importarBackup(inputBackup.files[0]);
     inputBackup.value='';
-  });
-
-  document.addEventListener('paste',function(e){
-    if(!document.getElementById('painelImport')) return;
-    var it=e.clipboardData&&e.clipboardData.items; if(!it) return;
-    for(var i=0;i<it.length;i++){
-      if(it[i].type&&it[i].type.indexOf('image')===0){
-        var f=it[i].getAsFile();
-        if(f){ e.preventDefault(); receberArquivo(f); return; }
-      }
-    }
   });
 
   function toast(msg){
@@ -926,7 +877,7 @@
       await sset(keyMes(id),m);
       meses=await carregarMeses();
     }
-    mesId=id; mes=m; filtroCat='todas'; imp={carregando:false,erro:null,itens:null,conta:imp.conta,origem:null};
+    mesId=id; mes=m; filtroCat='todas'; imp={carregando:false,erro:null,itens:null,conta:imp.conta};
     await garantirDraHeloisa();
     render(); window.scrollTo({top:0});
   }
@@ -1073,7 +1024,7 @@
     if(act==='ler-texto'){
       var tx=document.getElementById('imp-texto').value.trim();
       if(!tx){ toast('Cole o texto dos gastos primeiro.'); return; }
-      await processar(null,null,tx,'texto'); return;
+      await processar(tx); return;
     }
     if(act==='cancelar-import'){ imp.itens=null; imp.erro=null; render(); return; }
     if(act==='confirmar-import'){
