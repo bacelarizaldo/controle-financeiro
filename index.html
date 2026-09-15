@@ -280,8 +280,8 @@
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
-  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Pessoal','Impostos','Serviços','Assinaturas','Lazer','Educação','Cursos','Vestuário','Compras','Pets','Outros'];
-  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Assinaturas':'#A0527A','Lazer':'#B0763F','Educação':'#3F8F8C','Cursos':'#2E7D8C','Vestuário':'#B0507A','Compras':'#6B4FA0','Pets':'#5C8F3F','Outros':'#5E6B6B'};
+  var CATEGORIAS=['Moradia','Transporte','Saúde','Alimentação','Mercado','Pessoal','Impostos','Serviços','Assinaturas','Lazer','Educação','Cursos','Vestuário','Compras','Pets','Outros'];
+  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Saúde':'#2E6B4E','Alimentação':'#A8496B','Mercado':'#3F7D4A','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Assinaturas':'#A0527A','Lazer':'#B0763F','Educação':'#3F8F8C','Cursos':'#2E7D8C','Vestuário':'#B0507A','Compras':'#6B4FA0','Pets':'#5C8F3F','Outros':'#5E6B6B'};
   function corCat(c){ return CORES_CAT[c]||'#5E6B6B'; }
   function catSelect(tipo,id,val){
     return '<span class="catsel"><span class="catdot" style="background:'+corCat(val)+'"></span>'+
@@ -293,7 +293,8 @@
   var REGRAS_CATEGORIA=[
     ['Assinaturas',/netflix|spotify|amazon\s*prime|hbo\s*max|max\b|disney\+|paramount\+|globoplay|deezer|youtube\s*premium|apple\s*(music|tv\+|one)|icloud|google\s*one|assinatura/i],
     ['Compras',/mercado\s*livre|amazon|shopee|aliexpress|shein|magalu|magazine luiza|shopping\b|marketplace/i],
-    ['Alimentação',/ifood|rappi|uber\s*eats|restaurante|lanchonete|padaria|a[cç]ougue|hortifruti|mercado|supermercado|feira|pizza|burger|mc\s*donald|habib|subway/i],
+    ['Mercado',/supermercado|hipermercado|mercado\b|hortifruti|a[cç]ougue|sacol[ãa]o|atacad[ãa]o|atacarejo|carrefour|extra\b|assa[íi]|p[ãa]o de a[çc][úu]car|feira\b/i],
+    ['Alimentação',/ifood|rappi|uber\s*eats|restaurante|lanchonete|padaria|pizza|burger|mc\s*donald|habib|subway/i],
     ['Transporte',/uber|99app|99\s*pop|posto\b|combust[íi]vel|gasolina|etanol|estacionamento|ped[áa]gio|metr[oô]|[ôo]nibus|passagem a[ée]rea|localiza|movida/i],
     ['Saúde',/farm[áa]cia|drogaria|drogasil|pacheco|clínica|cl[ií]nica|hospital|laborat[oó]rio|exame|dentista|academia\b/i],
     ['Vestuário',/renner|riachuelo|c&a|zara|calçado|cal[çc]ados|marisa|hering|sapataria/i],
