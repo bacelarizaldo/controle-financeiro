@@ -1,0 +1,6 @@
+{
+  "name": "controle-financeiro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Controle financeiro pessoal — app estático + função serverless para leitura de faturas por print/texto."
+}
