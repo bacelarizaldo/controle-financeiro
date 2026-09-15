@@ -8,8 +8,11 @@
   navegador — agora os dados sincronizam entre celular e computador,
   porque o servidor é a fonte única de verdade.
 - **Login**: como os dados agora vivem num servidor de verdade (e não
-  presos ao seu navegador), o app pede uma senha antes de abrir
-  (`/api/login`). A sessão fica guardada num cookie por 60 dias.
+  presos ao seu navegador), o app pede usuário e senha antes de abrir
+  (`/api/login`). Dá pra cadastrar mais de uma pessoa (você e a
+  Heloísa, por exemplo) — todo mundo vê e edita os mesmos dados, cada
+  um só com seu próprio login. A sessão fica guardada num cookie por 60
+  dias.
 - **Leitura de print/texto**: a chamada para a IA vai por uma função
   própria (`/api/read-receipt`), que roda no servidor da Vercel e guarda
   sua chave de API em uma variável de ambiente — ela nunca fica exposta
@@ -79,8 +82,14 @@ precisa rodar nada manualmente.
 Em **Project Settings → Environment Variables**, adicione:
 
 - `ANTHROPIC_API_KEY` — a chave do passo 1 (pra leitura de print/texto).
-- `APP_PASSWORD` — a senha que você (e quem mais usar o app) vai digitar
-  pra entrar. Escolha algo só seu, não precisa ser complexo.
+- `APP_USERS` — um usuário e senha pra cada pessoa que vai usar o app,
+  em formato JSON. Exemplo (troque pelos seus):
+  ```
+  {"izaldo":"uma-senha-sua","heloisa":"outra-senha-so-dela"}
+  ```
+  Cole isso inteiro (com as chaves `{ }`) como o valor da variável. Pra
+  adicionar/trocar/remover alguém depois, é só editar esse JSON e fazer
+  redeploy de novo.
 - `SESSION_SECRET` — uma string aleatória qualquer, só pra assinar o
   cookie de sessão (por exemplo, gere uma em
   https://1password.com/password-generator ou rode `openssl rand -hex 32`
@@ -91,12 +100,14 @@ Depois de salvar as três, vá em **Deployments**, abra o menu "⋯" do
 
 ### 6. Pronto
 A Vercel te dá uma URL do tipo `controle-financeiro-xxxx.vercel.app`.
-Abra, digite a senha do `APP_PASSWORD` e o app carrega — migrando os
-dados antigos do navegador automaticamente, se houver (veja a seção
-acima). Salve o link nos favoritos ou na tela inicial do celular.
+Abra, entre com um dos usuários/senhas do `APP_USERS` e o app carrega —
+migrando os dados antigos do navegador automaticamente, se houver (veja
+a seção acima). Salve o link nos favoritos ou na tela inicial do
+celular.
 
-## Se mais de uma pessoa vai usar
-Hoje é uma senha única compartilhada (dá pra você e a Heloísa usarem o
-mesmo login, por exemplo). Se no futuro quiser contas separadas por
-pessoa, é uma mudança maior — me avise se quiser seguir por esse
-caminho.
+## Sobre os logins
+Todo mundo cadastrado em `APP_USERS` vê e edita os mesmos dados — não
+são contas separadas com informações diferentes, é a mesma planilha
+compartilhada, só com um login individual por pessoa. Se no futuro
+alguém precisar de dados totalmente separados dos outros, é uma
+mudança bem maior — me avise se for o caso.

@@ -80,17 +80,11 @@
   .cartao-box.c-azul{background:linear-gradient(155deg,var(--azul-esc),var(--azul))}
   .cartao-box.c-ultravioleta{background:linear-gradient(155deg,var(--violeta-esc),var(--violeta))}
 
-  .destino{border:none;border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:28px;background:var(--card);box-shadow:var(--shadow-sm)}
-  .destino h3{margin:0 0 2px;font-size:14px;font-weight:600}
-  .destino p{margin:0 0 12px;font-size:13px;color:var(--muted);max-width:62ch}
-  .dest-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
   .field{display:flex;flex-direction:column;gap:4px}
   .field label{font-size:12px;color:var(--muted)}
   .field input,.field select{border:1px solid var(--rule);background:#fff;border-radius:var(--radius-sm);padding:7px 10px;height:38px;transition:border-color .15s,box-shadow .15s}
   .field input:focus,.field select:focus,textarea:focus{outline:none;border-color:var(--ink);box-shadow:var(--ring)}
   #app .w-val{width:128px;text-align:right;font-family:var(--serif);font-variant-numeric:tabular-nums}
-  .livre{font-size:13px;color:var(--muted);padding-bottom:8px}
-  .livre b{font-family:var(--serif);font-variant-numeric:tabular-nums;color:var(--ink);font-size:15px}
 
   section{background:var(--card);border-radius:var(--radius-lg);padding:24px 26px 22px;margin-bottom:22px;box-shadow:var(--shadow-sm)}
   .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--rule-soft);padding-bottom:14px;margin-bottom:8px}
@@ -231,11 +225,11 @@
     .barra-val{font-size:10px}
     .barra-rot{font-size:10px}
     .topbar{padding:16px 0 12px}
-    .destino,.import{padding:16px}
+    .import{padding:16px}
   }
   @media (max-width:480px){
-    .adder .field,.dest-row .field{flex:1 1 100%}
-    .adder .field input,.adder .field select,.dest-row .field input{width:100%}
+    .adder .field{flex:1 1 100%}
+    .adder .field input,.adder .field select{width:100%}
     #app .w-val{width:100%}
     .cartao-box{min-width:100%}
     .tipo-bloco{min-width:100%}
@@ -945,8 +939,6 @@
   function viewMes(){
     var m=mes, idx=meses.indexOf(mesId);
     var s=sobra(m),ent=totEntradas(m),des=totDespesas(m),falta=faltaPagar(m);
-    var dst=m.destino||{investir:0,guardar:0,repassar:0};
-    var usado=(+dst.investir||0)+(+dst.guardar||0)+(+dst.repassar||0);
     var h='';
 
     h+='<div class="topbar"><div class="mesnav">';
@@ -958,6 +950,7 @@
     h+='<button class="toolbtn" data-act="export-backup">Baixar backup completo</button>';
     h+='<button class="toolbtn" data-act="import-backup">Importar backup</button>';
     h+='<button class="toolbtn" data-act="reset">Recomeçar do zero</button>';
+    h+=(window.__usuarioLogado&&window.__usuarioLogado()?'<span class="dim" style="align-self:center;padding:0 4px">'+esc(window.__usuarioLogado())+'</span>':'');
     h+='<button class="toolbtn" data-act="sair">Sair</button>';
     h+='</div></div>';
 
@@ -966,20 +959,13 @@
     h+='<div class="hero-num'+(s<0?' neg':'')+'">'+money(s)+'</div>';
     h+='<div class="hero-sub">'+(semEntrada
         ? 'Por enquanto isso é só o peso das contas fixas. Lance suas entradas abaixo para ver quanto sobra de verdade.'
-        : (s<0?'As saídas passaram as entradas. O valor acima é o que falta cobrir.':'Isso é o que entrou menos tudo que saiu no mês. Decida abaixo o destino.'))+'</div>';
+        : (s<0?'As saídas passaram as entradas. O valor acima é o que falta cobrir.':'Isso é o que entrou menos tudo que saiu no mês.'))+'</div>';
     h+='<div class="hero-grid">';
     h+='<div class="hero-cell"><span>Entrou</span><b>'+money(ent)+'</b></div>';
     h+='<div class="hero-cell"><span>Saiu</span><b>'+money(des)+'</b></div>';
     h+='<div class="hero-cell"><span>Contas ainda em aberto</span><b>'+money(falta)+'</b></div>';
     if(+m.repasse) h+='<div class="hero-cell"><span>Veio do mês anterior</span><b>'+money(m.repasse)+'</b></div>';
     h+='</div></div>';
-
-    h+='<div class="destino"><h3>Destino da sobra</h3>';
-    h+='<p>Divida o que sobrou. O valor em “passar para o próximo mês” entra como entrada em '+esc(nomeMesCurto(proxId(mesId)))+'.</p><div class="dest-row">';
-    h+='<div class="field"><label for="d-inv">Investir</label><input id="d-inv" class="w-val" data-dest="investir" value="'+(dst.investir?money(dst.investir):'')+'" placeholder="R$ 0,00"></div>';
-    h+='<div class="field"><label for="d-gua">Guardar</label><input id="d-gua" class="w-val" data-dest="guardar" value="'+(dst.guardar?money(dst.guardar):'')+'" placeholder="R$ 0,00"></div>';
-    h+='<div class="field"><label for="d-rep">Passar para o próximo mês</label><input id="d-rep" class="w-val" data-dest="repassar" value="'+(dst.repassar?money(dst.repassar):'')+'" placeholder="R$ 0,00"></div>';
-    h+='<div class="livre">Sem destino: <b>'+money(s-usado)+'</b></div></div></div>';
 
     // entradas
     h+='<section><div class="sec-head"><h2>Entradas</h2><span class="sec-total">'+money(ent)+'</span></div><table><tbody>';
@@ -997,11 +983,7 @@
     });
     h+='</tbody></table>';
     if(semEntrada) h+='<div class="vazio">Nenhuma entrada lançada ainda. Jobs fechados para este mês aparecem aqui sozinhos.</div>';
-    h+='<div class="adder">';
-    h+='<div class="field"><label for="ne-nome">De onde vem</label><input id="ne-nome" style="width:220px" placeholder="Honorários, aluguel recebido…"></div>';
-    h+='<div class="field"><label for="ne-val">Valor</label><input id="ne-val" class="w-val" placeholder="R$ 0,00"></div>';
-    h+='<label class="field" style="flex-direction:row;align-items:center;gap:6px;height:33px"><input type="checkbox" id="ne-fixa" checked style="width:auto;height:auto"><span style="font-size:13px;color:var(--muted)">repete todo mês</span></label>';
-    h+='<button class="addbtn" data-act="add-entrada">Adicionar entrada</button></div></section>';
+    h+='</section>';
 
     // contas fixas
     h+='<section><div class="sec-head"><h2>Contas fixas</h2><span class="sec-total">'+money(totFixas(m))+'</span></div>';
@@ -1216,17 +1198,6 @@
     }
 
     var act=t.dataset.act;
-    if(act==='add-entrada'){
-      var n=document.getElementById('ne-nome').value.trim(),v=parseNum(document.getElementById('ne-val').value);
-      if(!n||!v){ toast('Preencha de onde vem e o valor.'); return; }
-      var cbf=document.getElementById('ne-fixa'), repete=cbf?cbf.checked:false, rid=null;
-      if(repete){
-        rid='e'+uid();
-        cfg.entradasFixas.push({id:rid,nome:n,valor:v});
-        await sset(KEY_CFG,cfg);
-      }
-      mes.entradas.push({id:uid(),refId:rid,nome:n,valor:v}); await salvar(); render(); return;
-    }
     if(act==='add-fixa'){
       var nf=document.getElementById('nf-nome').value.trim();
       var d=parseInt(document.getElementById('nf-dia').value,10);
@@ -1385,14 +1356,6 @@
       }
       return;
     }
-    if(el.dataset.dest){
-      mes.destino=mes.destino||{investir:0,guardar:0,repassar:0};
-      mes.destino[el.dataset.dest]=parseNum(el.value);
-      await salvar();
-      var prox=await sget(keyMes(proxId(mesId)));
-      if(prox){ prox.repasse=+mes.destino.repassar||0; await sset(keyMes(proxId(mesId)),prox); }
-      render(); return;
-    }
   });
 
   async function corrigirSeedJobs(){
@@ -1475,30 +1438,37 @@
     document.getElementById('app').innerHTML='<div class="wrap"><p class="boot">Não consegui abrir o armazenamento. Recarregue a página para tentar de novo.</p></div>';
   }
 
+  var usuarioLogado=null;
+
   function telaLogin(msgErro){
     document.getElementById('app').innerHTML=
       '<div class="wrap" style="max-width:360px;padding-top:80px">'+
       '<h1 style="font-family:var(--serif);font-size:22px;margin:0 0 4px">Controle financeiro</h1>'+
-      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 18px">Digite a senha para continuar.</p>'+
+      '<p style="color:var(--muted);font-size:13.5px;margin:0 0 18px">Entre com seu usuário e senha.</p>'+
       (msgErro?'<div class="erro">'+esc(msgErro)+'</div>':'')+
+      '<div class="field" style="margin-bottom:12px"><input type="text" id="login-usuario" placeholder="Usuário" style="width:100%;height:40px" autocapitalize="off" autocorrect="off"></div>'+
       '<div class="field" style="margin-bottom:12px"><input type="password" id="login-senha" placeholder="Senha" style="width:100%;height:40px"></div>'+
       '<button class="addbtn" id="login-btn" style="width:100%">Entrar</button>'+
       '</div>';
-    var campo=document.getElementById('login-senha');
-    campo.focus();
-    campo.addEventListener('keydown',function(e){ if(e.key==='Enter') tentarLogin(); });
+    var campoUsuario=document.getElementById('login-usuario');
+    var campoSenha=document.getElementById('login-senha');
+    campoUsuario.focus();
+    campoUsuario.addEventListener('keydown',function(e){ if(e.key==='Enter') campoSenha.focus(); });
+    campoSenha.addEventListener('keydown',function(e){ if(e.key==='Enter') tentarLogin(); });
     document.getElementById('login-btn').addEventListener('click',tentarLogin);
   }
 
   async function tentarLogin(){
-    var campo=document.getElementById('login-senha');
-    var senha=campo?campo.value:'';
+    var usuario=document.getElementById('login-usuario').value.trim();
+    var senha=document.getElementById('login-senha').value;
     var btn=document.getElementById('login-btn');
+    if(!usuario||!senha){ telaLogin('Preencha usuário e senha.'); return; }
     if(btn){ btn.disabled=true; btn.textContent='Entrando…'; }
     try{
-      var resp=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({senha:senha})});
-      if(resp.ok){ iniciar(false).catch(erroBoot); }
-      else{ telaLogin('Senha incorreta.'); }
+      var resp=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario:usuario,senha:senha})});
+      var data=await resp.json().catch(function(){ return {}; });
+      if(resp.ok){ usuarioLogado=data.usuario||usuario; iniciar(false).catch(erroBoot); }
+      else{ telaLogin(data.error||'Usuário ou senha incorretos.'); }
     }catch(e){
       telaLogin('Não consegui falar com o servidor. Tente de novo.');
     }
@@ -1509,12 +1479,14 @@
     location.reload();
   }
   window.__sairApp=sair;
+  window.__usuarioLogado=function(){ return usuarioLogado; };
   window.__onUnauthorized=function(){ telaLogin(); };
 
   (async function(){
     try{
       var resp=await fetch('/api/session');
-      if(resp.ok) await iniciar(false);
+      var data=await resp.json().catch(function(){ return {}; });
+      if(resp.ok){ usuarioLogado=data.usuario||null; await iniciar(false); }
       else telaLogin();
     }catch(e){ erroBoot(); }
   })().catch(erroBoot);

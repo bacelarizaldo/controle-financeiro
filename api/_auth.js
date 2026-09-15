@@ -1,7 +1,8 @@
 // Verificação de sessão compartilhada entre as funções da API.
 // Usa um cookie assinado com HMAC (sem biblioteca externa e sem tabela
-// de sessão no banco) — a senha em si fica só na variável de ambiente
-// APP_PASSWORD, nunca no cookie.
+// de sessão no banco) — as senhas em si ficam só na variável de
+// ambiente APP_USERS, nunca no cookie. O cookie carrega apenas o nome
+// de usuário e a validade, pra dar pra saber quem está logado.
 const crypto = require('crypto');
 
 const COOKIE = 'fin_session';
@@ -13,28 +14,47 @@ function segredo() {
   return s;
 }
 
-function assinar(exp) {
-  const payload = String(exp);
+function usuarios() {
+  const raw = process.env.APP_USERS;
+  if (!raw) throw new Error('APP_USERS não configurada nas variáveis de ambiente da Vercel.');
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error('APP_USERS precisa ser um JSON válido, tipo {"izaldo":"senha1","heloisa":"senha2"}.');
+  }
+}
+
+function verificarLogin(usuario, senha) {
+  const mapa = usuarios();
+  const chave = Object.keys(mapa).filter(function (u) { return u.toLowerCase() === String(usuario || '').toLowerCase(); })[0];
+  if (!chave) return false;
+  return mapa[chave] === senha;
+}
+
+function assinar(exp, usuario) {
+  const payload = exp + '|' + encodeURIComponent(usuario);
   const h = crypto.createHmac('sha256', segredo()).update(payload).digest('hex');
   return payload + '.' + h;
 }
 
 function valido(token) {
-  if (!token) return false;
+  if (!token) return null;
   const i = token.lastIndexOf('.');
-  if (i < 0) return false;
+  if (i < 0) return null;
   const payload = token.slice(0, i);
   const assinatura = token.slice(i + 1);
   let esperado;
   try {
     esperado = crypto.createHmac('sha256', segredo()).update(payload).digest('hex');
   } catch (e) {
-    return false;
+    return null;
   }
-  if (assinatura.length !== esperado.length) return false;
-  if (!crypto.timingSafeEqual(Buffer.from(assinatura), Buffer.from(esperado))) return false;
-  const exp = parseInt(payload, 10);
-  return !!exp && Date.now() < exp;
+  if (assinatura.length !== esperado.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(assinatura), Buffer.from(esperado))) return null;
+  const partes = payload.split('|');
+  const exp = parseInt(partes[0], 10);
+  if (!exp || Date.now() >= exp) return null;
+  return decodeURIComponent(partes.slice(1).join('|'));
 }
 
 function parseCookies(req) {
@@ -50,6 +70,7 @@ function parseCookies(req) {
   return out;
 }
 
+// Retorna o nome do usuário logado, ou null se não autenticado.
 function autenticado(req) {
   return valido(parseCookies(req)[COOKIE]);
 }
@@ -62,14 +83,14 @@ function exigirAuth(req, res) {
   return true;
 }
 
-function cookieLogin() {
+function cookieLogin(usuario) {
   const exp = Date.now() + DIAS * 24 * 60 * 60 * 1000;
   const maxAge = DIAS * 24 * 60 * 60;
-  return COOKIE + '=' + assinar(exp) + '; HttpOnly; Secure; SameSite=Lax; Max-Age=' + maxAge + '; Path=/';
+  return COOKIE + '=' + assinar(exp, usuario) + '; HttpOnly; Secure; SameSite=Lax; Max-Age=' + maxAge + '; Path=/';
 }
 
 function cookieLogout() {
   return COOKIE + '=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/';
 }
 
-module.exports = { autenticado, exigirAuth, cookieLogin, cookieLogout };
+module.exports = { autenticado, exigirAuth, cookieLogin, cookieLogout, verificarLogin };
