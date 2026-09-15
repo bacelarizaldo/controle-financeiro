@@ -427,6 +427,49 @@
     if(!atual||!total||atual>total||total>60) return null;
     return {atual:atual,total:total};
   }
+  function nomeSemParcela(desc){ return String(desc||'').replace(RX_PARCELA,'').trim(); }
+
+  function somaMesesData(d,n){
+    var p=String(d||'').split('-'); if(p.length<3) return d;
+    var y=+p[0], mo=+p[1]+n, dia=+p[2];
+    while(mo>12){ mo-=12; y++; }
+    while(mo<1){ mo+=12; y--; }
+    var ultimoDia=new Date(y,mo,0).getDate();
+    dia=Math.min(dia,ultimoDia);
+    return y+'-'+String(mo).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  }
+
+  async function mesGarantido(id){
+    var m=await sget(keyMes(id));
+    if(!m){
+      m=mesNovo(id,cfg);
+      await sset(keyMes(id),m);
+      meses=await carregarMeses();
+    }
+    return m;
+  }
+
+  // gera nos meses seguintes as parcelas que ainda faltam (atual+1 até total),
+  // mantendo o mesmo cartão/categoria/valor e avançando a data mês a mês.
+  async function propagarParcelas(base,pc){
+    if(!pc||pc.total<=1||pc.atual>=pc.total) return;
+    var nomeBase=nomeSemParcela(base.descricao);
+    var id=mesId;
+    for(var i=pc.atual+1;i<=pc.total;i++){
+      id=proxId(id);
+      var mm=await mesGarantido(id);
+      mm.lancamentos.push({
+        id:uid(),
+        data:somaMesesData(base.data,i-pc.atual),
+        descricao:nomeBase+' ('+i+'/'+pc.total+')',
+        categoria:base.categoria,
+        valor:base.valor,
+        conta:base.conta,
+        parcelado:true
+      });
+      await sset(keyMes(id),mm);
+    }
+  }
 
   function normalizar(arr){
     return arr.map(function(x){
@@ -672,7 +715,7 @@
 
     h+='<section><div class="sec-head"><h2>Lançar pelo texto</h2></div>';
     h+='<div class="import" id="painelImport">';
-    h+='<p>Copie os lançamentos da fatura (do app do banco ou de um extrato) e cole abaixo. Se quiser, já escreva a categoria de cada gasto na própria linha (ex.: Alimentação, Transporte…) que ela é reconhecida do jeito que você escreveu; se não escrever, a categoria é adivinhada pelo nome do estabelecimento. Compras com parcela tipo “2/6” são detectadas sozinhas — você só confere.</p>';
+    h+='<p>Copie os lançamentos da fatura (do app do banco ou de um extrato) e cole abaixo. Se quiser, já escreva a categoria de cada gasto na própria linha (ex.: Alimentação, Transporte…) que ela é reconhecida do jeito que você escreveu; se não escrever, a categoria é adivinhada pelo nome do estabelecimento. Compras com parcela tipo “2/6” são detectadas sozinhas, e as parcelas seguintes já são lançadas nos próximos meses — você só confere.</p>';
     h+='<div class="imp-row"><div class="field"><label for="imp-conta">Esses gastos são do</label><select id="imp-conta">';
     cartoes.forEach(function(c){ h+='<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>'; });
     h+='</select></div></div>';
@@ -711,8 +754,10 @@
     h+='<div class="field"><label for="nc-cat">Categoria</label><select id="nc-cat">'+CATEGORIAS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>';
     h+='<div class="field"><label for="nc-conta">Cartão</label><select id="nc-conta">'+cartoes.map(function(c){return '<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>';}).join('')+'</select></div>';
     h+='<div class="field"><label for="nc-val">Valor</label><input id="nc-val" class="w-val" placeholder="R$ 0,00"></div>';
-    h+='<label class="field" style="flex-direction:row;align-items:center;gap:6px;height:33px"><input type="checkbox" id="nc-parc" style="width:auto;height:auto"><span style="font-size:13px;color:var(--muted)">é parcela</span></label>';
+    h+='<div class="field"><label for="nc-patual">Parcela</label><input id="nc-patual" style="width:52px;text-align:center" placeholder="1"></div>';
+    h+='<div class="field"><label for="nc-ptotal">de quantas</label><input id="nc-ptotal" style="width:52px;text-align:center" placeholder="1"></div>';
     h+='<button class="addbtn" data-act="add-cartao">Lançar</button></div>';
+    h+='<div class="sec-note">Se for uma compra parcelada, preencha “Parcela” e “de quantas” — as próximas parcelas são lançadas sozinhas nos meses seguintes.</div>';
     h+='</section>';
 
     cartoes.forEach(function(c){
@@ -1058,10 +1103,19 @@
     if(act==='add-cartao'){
       var descC=document.getElementById('nc-desc').value.trim(),vlC=parseNum(document.getElementById('nc-val').value);
       if(!descC||!vlC){ toast('Preencha a descrição e o valor.'); return; }
-      mes.lancamentos.push({id:uid(),data:document.getElementById('nc-data').value||mesId+'-01',descricao:descC,
-        categoria:document.getElementById('nc-cat').value,valor:vlC,conta:document.getElementById('nc-conta').value,
-        parcelado:document.getElementById('nc-parc').checked});
-      await salvar(); render(); return;
+      var dataC=document.getElementById('nc-data').value||mesId+'-01';
+      var catC=document.getElementById('nc-cat').value, contaC=document.getElementById('nc-conta').value;
+      var patual=parseInt(document.getElementById('nc-patual').value,10)||0;
+      var ptotal=parseInt(document.getElementById('nc-ptotal').value,10)||0;
+      var pc=detectaParcela(descC);
+      if(!pc && ptotal>1 && patual>=1 && patual<=ptotal){
+        pc={atual:patual,total:ptotal};
+        descC=nomeSemParcela(descC)+' ('+patual+'/'+ptotal+')';
+      }
+      mes.lancamentos.push({id:uid(),data:dataC,descricao:descC,categoria:catC,valor:vlC,conta:contaC,parcelado:!!pc});
+      await salvar();
+      if(pc) await propagarParcelas({data:dataC,categoria:catC,valor:vlC,conta:contaC,descricao:descC},pc);
+      render(); return;
     }
     if(act==='ler-texto'){
       var tx=document.getElementById('imp-texto').value.trim();
@@ -1071,11 +1125,18 @@
     if(act==='cancelar-import'){ imp.itens=null; imp.erro=null; render(); return; }
     if(act==='confirmar-import'){
       var usar=imp.itens.filter(function(i){return i.usar&&i.valor>0;});
+      var paraPropagar=[];
       usar.forEach(function(i){
         mes.lancamentos.push({id:uid(),data:i.data,descricao:i.descricao,categoria:i.categoria,valor:i.valor,conta:imp.conta,parcelado:!!i.parcelado});
+        if(i.parcelado){
+          var pc=detectaParcela(i.descricao);
+          if(pc) paraPropagar.push({lanc:{data:i.data,descricao:i.descricao,categoria:i.categoria,valor:i.valor,conta:imp.conta},pc:pc});
+        }
       });
       imp.itens=null; imp.erro=null;
-      await salvar(); render();
+      await salvar();
+      for(var pi=0;pi<paraPropagar.length;pi++){ await propagarParcelas(paraPropagar[pi].lanc,paraPropagar[pi].pc); }
+      render();
       toast(usar.length+(usar.length===1?' gasto lançado':' gastos lançados')+' em '+nomeConta(imp.conta)+'.');
       return;
     }
