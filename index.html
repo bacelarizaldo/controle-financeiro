@@ -849,10 +849,10 @@
   }
 
   // ---------- investimentos ----------
-  var ROT_TIPO_INVEST={selic:'Tesouro Selic',cdb:'CDB',cdi:'CDI',acao:'Ações'};
-  var CHIP_TIPO_INVEST={selic:'inv-selic',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
-  function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='cdb'||i.tipo==='cdi'; }
-  function ehPrefixado(inv){ return inv.tipo==='cdb'&&inv.rentabilidade==='pre'; }
+  var ROT_TIPO_INVEST={selic:'Tesouro Selic',txpre:'Tesouro Prefixado',cdb:'CDB',cdi:'CDI',acao:'Ações'};
+  var CHIP_TIPO_INVEST={selic:'inv-selic',txpre:'inv-selic',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
+  function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
+  function ehPrefixado(inv){ return inv.tipo==='txpre'||(inv.tipo==='cdb'&&inv.rentabilidade==='pre'); }
   function serieDoInvest(inv){ return inv.tipo==='selic' ? mercado.selic : mercado.cdi; }
   function mesesDesde(mesIni,mesFim){ var out=[],cur=mesIni; while(cur<=mesFim){ out.push(cur); cur=proxId(cur); } return out; }
   function diasParaVencimento(venc){
@@ -1015,7 +1015,7 @@
       h+='<div class="field"><label for="nvi-pm">Preço médio</label><input id="nvi-pm" class="w-val" placeholder="R$ 0,00"></div>';
       h+='<div class="field"><label for="nvi-corretora">Corretora</label><input id="nvi-corretora" style="width:140px" placeholder="Ex.: XP, Clear…"></div>';
     }else{
-      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="Ex.: CDB Banco X"></div>';
+      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':'Ex.: CDB Banco X')+'"></div>';
       h+='<div class="field"><label for="nvi-val">Valor aplicado</label><input id="nvi-val" class="w-val" placeholder="R$ 0,00"></div>';
       if(tipoNovoInvest==='cdb'){
         h+='<div class="field"><label for="nvi-rent">Rentabilidade</label><select id="nvi-rent">'+
@@ -1023,8 +1023,8 @@
           '<option value="pre"'+(rentNovoInvest==='pre'?' selected':'')+'>Prefixado (taxa ao ano)</option>'+
           '</select></div>';
       }
-      if(tipoNovoInvest==='cdb'&&rentNovoInvest==='pre'){
-        h+='<div class="field"><label for="nvi-taxa">Taxa (% a.a.)</label><input id="nvi-taxa" style="width:80px;text-align:center" placeholder="Ex.: 14,5"></div>';
+      if(tipoNovoInvest==='txpre'||(tipoNovoInvest==='cdb'&&rentNovoInvest==='pre')){
+        h+='<div class="field"><label for="nvi-taxa">Taxa contratada (% a.a.)</label><input id="nvi-taxa" style="width:80px;text-align:center" placeholder="Ex.: 12,8"></div>';
       }else{
         h+='<div class="field"><label for="nvi-perc">% do '+(tipoNovoInvest==='selic'?'Selic':'CDI')+'</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
       }
@@ -1062,7 +1062,7 @@
         h+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
         h+='</div></div></div>';
       });
-      h+='<div class="sec-note">Prefixados usam a taxa contratada direto, sem depender de cotação. Selic/CDI e CDB pós-fixado são calculados mês a mês pela taxa oficial do Banco Central vezes o percentual contratado — clique em “Atualizar cotações” pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
+      h+='<div class="sec-note">Prefixados (CDB e Tesouro Prefixado) usam a taxa contratada compondo mês a mês — é o valor "se segurar até o vencimento", não a marcação a mercado do dia a dia (por isso pode não bater com o que a corretora mostra, principalmente no Tesouro Prefixado). Selic/CDI e CDB pós-fixado são calculados mês a mês pela taxa oficial do Banco Central vezes o percentual contratado — clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
     }
     h+='</section>';
 
@@ -1659,9 +1659,9 @@
         novoInv.instituicao=document.getElementById('nvi-instituicao').value.trim();
         novoInv.vencimento=document.getElementById('nvi-venc').value||'';
         novoInv.liquidez=document.getElementById('nvi-liquidez').value;
-        if(tpi==='cdb'&&document.getElementById('nvi-rent').value==='pre'){
+        if(((tpi==='cdb')&&document.getElementById('nvi-rent').value==='pre')||tpi==='txpre'){
           var txp=parseNum(document.getElementById('nvi-taxa').value);
-          if(!txp){ toast('Preencha a taxa prefixada ao ano.'); return; }
+          if(!txp){ toast('Preencha a taxa contratada ao ano.'); return; }
           novoInv.rentabilidade='pre'; novoInv.taxaPrefixada=txp;
         }else{
           novoInv.rentabilidade='pos'; novoInv.percIndexador=parseNum(document.getElementById('nvi-perc').value)||100;
