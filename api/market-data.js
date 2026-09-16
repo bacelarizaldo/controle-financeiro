@@ -1,6 +1,7 @@
 // Dados de mercado para a aba Investimentos.
-// - CDI e Selic: série mensal acumulada direto do Banco Central (SGS),
-//   pública, sem chave. CDI = série 4391, Selic = série 4390 (% ao mês).
+// - CDI, Selic e IPCA: série mensal direto do Banco Central (SGS),
+//   pública, sem chave. CDI = série 4391, Selic = série 4390 (% ao mês
+//   acumulado), IPCA = série 433 (% de variação no mês, do IBGE).
 // - Tesouro Direto: preço unitário (PU) de compra/resgate do dia, via o
 //   dataset público oficial do Tesouro Transparente (CKAN, mantido pelo
 //   governo) — gratuito, sem chave, sem plano pago. É o dado de marcação
@@ -164,8 +165,8 @@ module.exports = async function handler(req, res) {
   try {
     const tipo = req.query.tipo;
 
-    if (tipo === 'cdi' || tipo === 'selic') {
-      const codigo = tipo === 'cdi' ? 4391 : 4390;
+    if (tipo === 'cdi' || tipo === 'selic' || tipo === 'ipca') {
+      const codigo = tipo === 'cdi' ? 4391 : (tipo === 'selic' ? 4390 : 433);
       const desde = req.query.desde || null;
       const chave = 'sgs:' + codigo + ':' + (desde || 'full');
       const serie = await doCache(chave, 12 * 60 * 60 * 1000, function () { return buscarSerieBCB(codigo, desde); });
@@ -193,7 +194,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    res.status(400).json({ error: 'Parâmetro "tipo" inválido — use cdi, selic, tesouro ou acao.' });
+    res.status(400).json({ error: 'Parâmetro "tipo" inválido — use cdi, selic, ipca, tesouro ou acao.' });
   } catch (err) {
     res.status(500).json({ error: String((err && err.message) || err) });
   }

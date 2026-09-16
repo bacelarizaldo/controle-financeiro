@@ -202,6 +202,7 @@
   .chip.avulsa{border-color:var(--rule);background:#fff;color:var(--muted)}
   .chip.inv-selic{border-color:transparent;background:#E7EFF9;color:var(--azul-esc)}
   .chip.inv-txpre{border-color:transparent;background:#E9ECF7;color:var(--indigo-esc)}
+  .chip.inv-ipca{border-color:transparent;background:#F3ECD8;color:var(--ambron-esc)}
   .chip.inv-cdb{border-color:transparent;background:#E7F1EA;color:var(--green)}
   .chip.inv-cdi{border-color:transparent;background:#F1E9F8;color:var(--violeta-esc)}
   .chip.inv-acao{border-color:transparent;background:#F7E8EE;color:var(--rose-esc)}
@@ -252,6 +253,7 @@
   .conta-top.c-verde{background:#E7F1EA;border-left-color:var(--green)}
   .conta-top.c-selic{background:#E7EFF9;border-left-color:var(--azul)}
   .conta-top.c-txpre{background:#E9ECF7;border-left-color:var(--indigo)}
+  .conta-top.c-ipca{background:#F3ECD8;border-left-color:var(--ambron)}
   .conta-top.c-cdb{background:#E7F1EA;border-left-color:var(--green)}
   .conta-top.c-cdi{background:#F1E9F8;border-left-color:var(--violeta)}
   .conta-top.c-acao{background:#F7E8EE;border-left-color:var(--rose)}
@@ -417,7 +419,7 @@
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
-  var investimentos=[], mercado={cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
+  var investimentos=[], mercado={cdi:[],selic:[],ipca:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
   var KEY_INVEST='fin:investimentos', KEY_MERCADO='fin:mercado_cache';
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
@@ -860,14 +862,14 @@
   }
 
   // ---------- investimentos ----------
-  var ROT_TIPO_INVEST={selic:'Tesouro Selic',txpre:'Tesouro Prefixado',cdb:'CDB',cdi:'CDI',acao:'Ações'};
-  var CHIP_TIPO_INVEST={selic:'inv-selic',txpre:'inv-txpre',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
-  var COR_TIPO_INVEST={selic:'#2A5FA8',txpre:'#35528F',cdb:'#2E6B4E',cdi:'#7A4FB0',acao:'#A8496B'};
-  var ORDEM_TIPO_INVEST=['selic','txpre','cdb','cdi','acao'];
+  var ROT_TIPO_INVEST={selic:'Tesouro Selic',ipca:'Tesouro IPCA+',txpre:'Tesouro Prefixado',cdb:'CDB',cdi:'CDI',acao:'Ações'};
+  var CHIP_TIPO_INVEST={selic:'inv-selic',ipca:'inv-ipca',txpre:'inv-txpre',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
+  var COR_TIPO_INVEST={selic:'#2A5FA8',ipca:'#8C6712',txpre:'#35528F',cdb:'#2E6B4E',cdi:'#7A4FB0',acao:'#A8496B'};
+  var ORDEM_TIPO_INVEST=['selic','ipca','txpre','cdb','cdi','acao'];
   var gruposInvestFechados={};
-  function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
+  function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='ipca'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
   function ehPrefixado(inv){ return inv.tipo==='txpre'||(inv.tipo==='cdb'&&inv.rentabilidade==='pre'); }
-  function serieDoInvest(inv){ return inv.tipo==='selic' ? mercado.selic : mercado.cdi; }
+  function serieDoInvest(inv){ if(inv.tipo==='selic') return mercado.selic; if(inv.tipo==='ipca') return mercado.ipca; return mercado.cdi; }
   function hojeISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function diasEntre(d1,d2){ return Math.round((new Date(d2+'T00:00:00')-new Date(d1+'T00:00:00'))/86400000); }
   function fimDoMesISO(mesId2){ var p=mesId2.split('-'),y=+p[0],m=+p[1]; var ultimo=new Date(y,m,0).getDate(); return mesId2+'-'+String(ultimo).padStart(2,'0'); }
@@ -903,8 +905,9 @@
   // CDI/CDB pós-fixado usa percentual MULTIPLICATIVO (ex.: "100% do CDI"),
   // que é como o mercado de CDB de fato cota.
   function taxaMensalEfetiva(inv, taxaIndexadorMes){
-    if(inv.tipo==='selic'){
-      var spreadMes=Math.pow(1+(+inv.spreadSelic||0)/100,1/12)-1;
+    if(inv.tipo==='selic'||inv.tipo==='ipca'){
+      var spreadAnual=inv.tipo==='selic'?(+inv.spreadSelic||0):(+inv.spreadIpca||0);
+      var spreadMes=Math.pow(1+spreadAnual/100,1/12)-1;
       return (taxaIndexadorMes/100)+spreadMes;
     }
     return (taxaIndexadorMes/100)*((+inv.percIndexador||100)/100);
@@ -934,6 +937,7 @@
     var n=(t.nome||'').toLowerCase();
     if(inv.tipo==='selic') return n.indexOf('selic')>-1;
     if(inv.tipo==='txpre') return n.indexOf('prefixado')>-1 && n.indexOf('juros semestrais')===-1;
+    if(inv.tipo==='ipca') return n.indexOf('ipca')>-1 && n.indexOf('juros semestrais')===-1;
     return false;
   }
   function tituloDoInvest(inv){
@@ -957,7 +961,7 @@
   // estimativa por taxa: prefixado usa a taxa contratada (sempre
   // disponível), pós-fixado depende da série do BCB já ter sido buscada
   function valorAtualRendaFixa(inv){
-    if(inv.tipo==='selic'||inv.tipo==='txpre'){
+    if(inv.tipo==='selic'||inv.tipo==='txpre'||inv.tipo==='ipca'){
       var pu=valorAtualTesouroPU(inv);
       if(pu!=null) return pu;
     }
@@ -1006,7 +1010,7 @@
       var taxaMes=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/12)-1;
       return atual*Math.pow(1+taxaMes,mesesAFrente);
     }
-    var serieRef=inv.tipo==='selic'?mercado.selic:mercado.cdi;
+    var serieRef=serieDoInvest(inv);
     var taxaMedia=taxaMediaMensal(serieRef,6);
     if(taxaMedia==null) return atual;
     return atual*Math.pow(1+taxaMensalEfetiva(inv,taxaMedia),mesesAFrente);
@@ -1037,11 +1041,12 @@
       var minData=rf.reduce(function(m,i){return (!m||i.data<m)?i.data:m;},null);
       var acoes=investimentos.filter(function(i){return i.tipo==='acao'&&i.ticker;});
       var tickers=Array.from(new Set(acoes.map(function(i){return i.ticker.toUpperCase();})));
-      var temTesouro=investimentos.some(function(i){return i.tipo==='selic'||i.tipo==='txpre';});
+      var temTesouro=investimentos.some(function(i){return i.tipo==='selic'||i.tipo==='txpre'||i.tipo==='ipca';});
 
       var chamadas=[
         {nome:'CDI', chave:'cdi', url:'/api/market-data?tipo=cdi'+(minData?'&desde='+minData:'')},
-        {nome:'Selic', chave:'selic', url:'/api/market-data?tipo=selic'+(minData?'&desde='+minData:'')}
+        {nome:'Selic', chave:'selic', url:'/api/market-data?tipo=selic'+(minData?'&desde='+minData:'')},
+        {nome:'IPCA', chave:'ipca', url:'/api/market-data?tipo=ipca'+(minData?'&desde='+minData:'')}
       ];
       if(tickers.length) chamadas.push({nome:'Ações', chave:'acao', url:'/api/market-data?tipo=acao&ticker='+encodeURIComponent(tickers.join(','))});
       if(temTesouro) chamadas.push({nome:'Tesouro Direto', chave:'tesouro', url:'/api/market-data?tipo=tesouro'});
@@ -1054,6 +1059,7 @@
       mercado={
         cdi: (porChave.cdi&&porChave.cdi.serie)||mercado.cdi,
         selic: (porChave.selic&&porChave.selic.serie)||mercado.selic,
+        ipca: (porChave.ipca&&porChave.ipca.serie)||mercado.ipca,
         acoes: Object.assign({},mercado.acoes,(porChave.acao&&porChave.acao.cotacoes)||{}),
         tesouro: (porChave.tesouro&&porChave.tesouro.titulos)||mercado.tesouro,
         atualizadoEm: new Date().toISOString()
@@ -1076,13 +1082,13 @@
       c+='<div class="fin-linha"><span>'+(+inv.quantidade||0)+' cotas · preço médio '+money(inv.precoMedio)+'</span><span>'+(mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()]?'Cotação atual: '+money(mercado.acoes[(inv.ticker||'').toUpperCase()].preco):'Cotação ainda não atualizada')+'</span></div>';
       if(inv.corretora) c+='<div class="fin-linha"><span>Corretora</span><span>'+esc(inv.corretora)+'</span></div>';
     }else{
-      c+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):(inv.tipo==='selic'?('Selic + '+(+inv.spreadSelic||0).toFixed(3)+'% a.a.'):((+inv.percIndexador||100)+'% do CDI')))+'</span></div>';
+      c+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):(inv.tipo==='selic'?('Selic + '+(+inv.spreadSelic||0).toFixed(3)+'% a.a.'):(inv.tipo==='ipca'?('IPCA + '+(+inv.spreadIpca||0).toFixed(3)+'% a.a.'):((+inv.percIndexador||100)+'% do CDI'))))+'</span></div>';
       if(inv.instituicao||inv.liquidez) c+='<div class="fin-linha"><span>'+(inv.instituicao?esc(inv.instituicao):'—')+'</span><span>Liquidez: '+(inv.liquidez==='vencimento'?'no vencimento':'diária')+'</span></div>';
       if(inv.vencimento){
         var dv=diasParaVencimento(inv.vencimento);
         c+='<div class="fin-linha"><span>Vencimento</span><span>'+esc(dataCurta(inv.vencimento))+(dv==null?'':(dv<0?' (vencido)':' (em '+dv+' dias)'))+'</span></div>';
       }
-      if(inv.tipo==='selic'||inv.tipo==='txpre'){
+      if(inv.tipo==='selic'||inv.tipo==='txpre'||inv.tipo==='ipca'){
         if(inv.quantidadeTitulos){
           var t=tituloDoInvest(inv);
           c+='<div class="fin-linha"><span>'+(+inv.quantidadeTitulos)+' título(s)</span><span>'+(t?('PU de resgate hoje: '+money(t.precoResgate)):'Título não encontrado na lista de hoje — usando estimativa por taxa')+'</span></div>';
@@ -1112,7 +1118,7 @@
 
     h+='<div class="hero hero-invest"><div class="hero-label">Valor atual da carteira</div>';
     h+='<div class="hero-num">'+money(totalAtual)+'</div>';
-    h+='<div class="hero-sub">'+(investimentos.length?('Aplicado: '+money(totalAplicado)+' · Rendimento: '+(totalRend>=0?'+':'')+money(totalRend)+' ('+(pctRend>=0?'+':'')+pctRend.toFixed(2)+'%)'):'Cadastre seus investimentos (Selic, CDB, CDI, ações) pra acompanhar o rendimento aqui.')+'</div>';
+    h+='<div class="hero-sub">'+(investimentos.length?('Aplicado: '+money(totalAplicado)+' · Rendimento: '+(totalRend>=0?'+':'')+money(totalRend)+' ('+(pctRend>=0?'+':'')+pctRend.toFixed(2)+'%)'):'Cadastre seus investimentos (Selic, IPCA+, CDB, CDI, ações) pra acompanhar o rendimento aqui.')+'</div>';
     if(investimentos.length){
       h+='<div class="hero-grid"><div class="hero-cell"><span>Ativos cadastrados</span><b>'+investimentos.length+'</b></div>';
       h+='<div class="hero-cell"><span>Cotações atualizadas</span><b>'+(mercado.atualizadoEm?dataCurta(mercado.atualizadoEm.slice(0,10))+' '+new Date(mercado.atualizadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'ainda não')+'</b></div></div>';
@@ -1131,9 +1137,9 @@
       h+='<div class="field"><label for="nvi-pm">Preço médio</label><input id="nvi-pm" class="w-val" placeholder="R$ 0,00"></div>';
       h+='<div class="field"><label for="nvi-corretora">Corretora</label><input id="nvi-corretora" style="width:140px" placeholder="Ex.: XP, Clear…"></div>';
     }else{
-      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':(tipoNovoInvest==='selic'?'Ex.: Tesouro Selic 2031':'Ex.: CDB Banco X'))+'"></div>';
+      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':(tipoNovoInvest==='selic'?'Ex.: Tesouro Selic 2031':(tipoNovoInvest==='ipca'?'Ex.: Tesouro IPCA+ 2035':'Ex.: CDB Banco X')))+'"></div>';
       h+='<div class="field"><label for="nvi-val">Valor aplicado</label><input id="nvi-val" class="w-val" placeholder="R$ 0,00"></div>';
-      if(tipoNovoInvest==='selic'||tipoNovoInvest==='txpre'){
+      if(tipoNovoInvest==='selic'||tipoNovoInvest==='txpre'||tipoNovoInvest==='ipca'){
         h+='<div class="field"><label for="nvi-qtdtit">Qtd. de títulos</label><input id="nvi-qtdtit" style="width:80px;text-align:right" placeholder="Ex.: 2,78"></div>';
       }
       if(tipoNovoInvest==='cdb'){
@@ -1144,8 +1150,8 @@
       }
       if(tipoNovoInvest==='txpre'||(tipoNovoInvest==='cdb'&&rentNovoInvest==='pre')){
         h+='<div class="field"><label for="nvi-taxa">Taxa contratada (% a.a.)</label><input id="nvi-taxa" style="width:80px;text-align:center" placeholder="Ex.: 12,8"></div>';
-      }else if(tipoNovoInvest==='selic'){
-        h+='<div class="field"><label for="nvi-spread">Selic + spread (% a.a.)</label><input id="nvi-spread" style="width:80px;text-align:center" placeholder="Ex.: 0,073" value="0"></div>';
+      }else if(tipoNovoInvest==='selic'||tipoNovoInvest==='ipca'){
+        h+='<div class="field"><label for="nvi-spread">'+(tipoNovoInvest==='selic'?'Selic':'IPCA')+' + spread (% a.a.)</label><input id="nvi-spread" style="width:80px;text-align:center" placeholder="Ex.: 0,073" value="0"></div>';
       }else{
         h+='<div class="field"><label for="nvi-perc">% do CDI</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
       }
@@ -1173,7 +1179,7 @@
         h+='</button>';
         if(!fechado) doTipo.forEach(function(inv){ h+=cardInvestHTML(inv); });
       });
-      h+='<div class="sec-note">Tesouro Selic e Tesouro Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
+      h+='<div class="sec-note">Tesouro Selic, IPCA+ e Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
     }
     h+='</section>';
 
@@ -1772,7 +1778,7 @@
         var vvi=parseNum(document.getElementById('nvi-val').value);
         if(!nvn||!vvi){ toast('Preencha o nome e o valor aplicado.'); return; }
         novoInv.nome=nvn; novoInv.valorAplicado=vvi;
-        if(tpi==='selic'||tpi==='txpre'){
+        if(tpi==='selic'||tpi==='txpre'||tpi==='ipca'){
           var qtit=parseNum(document.getElementById('nvi-qtdtit').value);
           if(qtit) novoInv.quantidadeTitulos=qtit;
         }
@@ -1783,8 +1789,9 @@
           var txp=parseNum(document.getElementById('nvi-taxa').value);
           if(!txp){ toast('Preencha a taxa contratada ao ano.'); return; }
           novoInv.rentabilidade='pre'; novoInv.taxaPrefixada=txp;
-        }else if(tpi==='selic'){
-          novoInv.spreadSelic=parseNum(document.getElementById('nvi-spread').value)||0;
+        }else if(tpi==='selic'||tpi==='ipca'){
+          var spreadVal=parseNum(document.getElementById('nvi-spread').value)||0;
+          if(tpi==='selic') novoInv.spreadSelic=spreadVal; else novoInv.spreadIpca=spreadVal;
         }else{
           novoInv.rentabilidade='pos'; novoInv.percIndexador=parseNum(document.getElementById('nvi-perc').value)||100;
         }
