@@ -884,15 +884,27 @@
     }
     return out;
   }
+  // taxa mensal efetiva pós-fixada: Tesouro Selic usa spread ADITIVO
+  // (ex.: "Selic + 0,073% a.a.", como o próprio Tesouro Direto contrata);
+  // CDI/CDB pós-fixado usa percentual MULTIPLICATIVO (ex.: "100% do CDI"),
+  // que é como o mercado de CDB de fato cota.
+  function taxaMensalEfetiva(inv, taxaIndexadorMes){
+    if(inv.tipo==='selic'){
+      var spreadMes=Math.pow(1+(+inv.spreadSelic||0)/100,1/12)-1;
+      return (taxaIndexadorMes/100)+spreadMes;
+    }
+    return (taxaIndexadorMes/100)*((+inv.percIndexador||100)/100);
+  }
   // histórico mês a mês de um pós-fixado, aplicando a taxa acumulada
-  // (CDI ou Selic) do Banco Central vezes o percentual contratado
+  // (CDI ou Selic) do Banco Central mais o spread ou vezes o percentual
+  // contratado, conforme o tipo
   function historicoPosFixado(inv){
     var serie=serieDoInvest(inv);
     if(!serie||!serie.length) return [];
     var mesIni=(inv.data||'').slice(0,7), valor=+inv.valorAplicado||0, out=[];
     serie.forEach(function(p){
       if(p.mes<mesIni) return;
-      var rend=valor*(p.taxa/100)*((+inv.percIndexador||100)/100);
+      var rend=valor*taxaMensalEfetiva(inv,p.taxa);
       valor+=rend;
       out.push({mes:p.mes, rendimento:rend, acumulado:valor});
     });
@@ -980,11 +992,10 @@
       var taxaMes=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/12)-1;
       return atual*Math.pow(1+taxaMes,mesesAFrente);
     }
-    var tCdi=taxaMediaMensal(mercado.cdi,6), tSelic=taxaMediaMensal(mercado.selic,6);
-    var taxa=(tCdi!=null&&tSelic!=null)?(tCdi+tSelic)/2:(tCdi!=null?tCdi:tSelic);
-    if(taxa==null) return atual;
-    var fator=(+inv.percIndexador||100)/100;
-    return atual*Math.pow(1+(taxa/100)*fator,mesesAFrente);
+    var serieRef=inv.tipo==='selic'?mercado.selic:mercado.cdi;
+    var taxaMedia=taxaMediaMensal(serieRef,6);
+    if(taxaMedia==null) return atual;
+    return atual*Math.pow(1+taxaMensalEfetiva(inv,taxaMedia),mesesAFrente);
   }
   function projecaoRendaFixa(mesesAFrente){
     var lista=investimentos.filter(ehRendaFixaInv);
@@ -1073,7 +1084,7 @@
       h+='<div class="field"><label for="nvi-pm">Preço médio</label><input id="nvi-pm" class="w-val" placeholder="R$ 0,00"></div>';
       h+='<div class="field"><label for="nvi-corretora">Corretora</label><input id="nvi-corretora" style="width:140px" placeholder="Ex.: XP, Clear…"></div>';
     }else{
-      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':'Ex.: CDB Banco X')+'"></div>';
+      h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':(tipoNovoInvest==='selic'?'Ex.: Tesouro Selic 2031':'Ex.: CDB Banco X'))+'"></div>';
       h+='<div class="field"><label for="nvi-val">Valor aplicado</label><input id="nvi-val" class="w-val" placeholder="R$ 0,00"></div>';
       if(tipoNovoInvest==='selic'||tipoNovoInvest==='txpre'){
         h+='<div class="field"><label for="nvi-qtdtit">Qtd. de títulos</label><input id="nvi-qtdtit" style="width:80px;text-align:right" placeholder="Ex.: 2,78"></div>';
@@ -1086,8 +1097,10 @@
       }
       if(tipoNovoInvest==='txpre'||(tipoNovoInvest==='cdb'&&rentNovoInvest==='pre')){
         h+='<div class="field"><label for="nvi-taxa">Taxa contratada (% a.a.)</label><input id="nvi-taxa" style="width:80px;text-align:center" placeholder="Ex.: 12,8"></div>';
+      }else if(tipoNovoInvest==='selic'){
+        h+='<div class="field"><label for="nvi-spread">Selic + spread (% a.a.)</label><input id="nvi-spread" style="width:80px;text-align:center" placeholder="Ex.: 0,073" value="0"></div>';
       }else{
-        h+='<div class="field"><label for="nvi-perc">% do '+(tipoNovoInvest==='selic'?'Selic':'CDI')+'</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
+        h+='<div class="field"><label for="nvi-perc">% do CDI</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
       }
       h+='<div class="field"><label for="nvi-instituicao">Instituição</label><input id="nvi-instituicao" style="width:150px" placeholder="Ex.: Banco X, XP…"></div>';
       h+='<div class="field"><label for="nvi-venc">Vencimento</label><input id="nvi-venc" type="date"></div>';
@@ -1110,7 +1123,7 @@
           h+='<div class="fin-linha"><span>'+(+inv.quantidade||0)+' cotas · preço médio '+money(inv.precoMedio)+'</span><span>'+(mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()]?'Cotação atual: '+money(mercado.acoes[(inv.ticker||'').toUpperCase()].preco):'Cotação ainda não atualizada')+'</span></div>';
           if(inv.corretora) h+='<div class="fin-linha"><span>Corretora</span><span>'+esc(inv.corretora)+'</span></div>';
         }else{
-          h+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):((+inv.percIndexador||100)+'% do '+(inv.tipo==='selic'?'Selic':'CDI')))+'</span></div>';
+          h+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):(inv.tipo==='selic'?('Selic + '+(+inv.spreadSelic||0).toFixed(3)+'% a.a.'):((+inv.percIndexador||100)+'% do CDI')))+'</span></div>';
           if(inv.instituicao||inv.liquidez) h+='<div class="fin-linha"><span>'+(inv.instituicao?esc(inv.instituicao):'—')+'</span><span>Liquidez: '+(inv.liquidez==='vencimento'?'no vencimento':'diária')+'</span></div>';
           if(inv.vencimento){
             var dv=diasParaVencimento(inv.vencimento);
@@ -1736,6 +1749,8 @@
           var txp=parseNum(document.getElementById('nvi-taxa').value);
           if(!txp){ toast('Preencha a taxa contratada ao ano.'); return; }
           novoInv.rentabilidade='pre'; novoInv.taxaPrefixada=txp;
+        }else if(tpi==='selic'){
+          novoInv.spreadSelic=parseNum(document.getElementById('nvi-spread').value)||0;
         }else{
           novoInv.rentabilidade='pos'; novoInv.percIndexador=parseNum(document.getElementById('nvi-perc').value)||100;
         }
