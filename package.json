@@ -4,6 +4,7 @@
   "private": true,
   "description": "Controle financeiro pessoal — app estático + funções serverless (login, armazenamento em Postgres e leitura de faturas por print/texto).",
   "dependencies": {
-    "@vercel/postgres": "^0.10.0"
+    "@vercel/postgres": "^0.10.0",
+    "bcryptjs": "^2.4.3"
   }
 }
