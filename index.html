@@ -45,6 +45,7 @@
   }
   #app *{box-sizing:border-box}
   #app{font-family:var(--sans);color:var(--ink);background:var(--paper);font-size:15px;line-height:1.45;padding:0 0 64px}
+  #app:has(>.login-screen){padding-bottom:0}
   #app button{font-family:inherit;font-size:inherit;cursor:pointer}
   #app input,#app select,#app textarea{font-family:inherit;font-size:inherit;color:var(--ink)}
   .num,.val{font-family:var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-0.01em}
@@ -266,8 +267,9 @@
 
   .grupo-invest-head{display:flex;align-items:center;gap:8px;width:100%;margin:20px 0 8px;padding:10px 12px;border:none;background:var(--card);border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);font-size:13px;color:var(--ink);font-weight:600;text-align:left;transition:box-shadow .15s}
   .grupo-invest-head:hover{box-shadow:var(--shadow-md)}
-  .grupo-invest-nome{flex:1}
-  .grupo-invest-seta{color:var(--muted);font-size:11px;width:12px;text-align:center}
+  .grupo-invest-nome{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grupo-invest-head .dim{white-space:nowrap}
+  .grupo-invest-seta{color:var(--muted);font-size:11px;width:12px;text-align:center;flex-shrink:0}
 
   .filtros{display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 4px}
   .fchip{border:1px solid var(--rule);background:transparent;border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--muted);transition:background .15s,color .15s}
@@ -276,7 +278,7 @@
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:999px;font-size:13.5px;z-index:50;box-shadow:var(--shadow-md)}
   .rodape{border-top:none;padding-top:6px;font-size:12.5px;color:var(--muted);max-width:68ch}
 
-  .abas{display:flex;gap:2px;padding:5px;margin-bottom:22px;background:#E6E8E0;border-radius:999px;width:fit-content;max-width:100%;overflow-x:auto}
+  .abas{display:flex;gap:2px;padding:5px;margin-bottom:22px;background:#E6E8E0;border-radius:999px;width:fit-content;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .aba{border:none;background:transparent;color:var(--muted);padding:9px 17px;border-radius:999px;font-size:14px;white-space:nowrap;transition:background .15s,color .15s}
   .aba:hover{color:var(--ink)}
   .aba[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--shadow-sm)}
@@ -289,12 +291,31 @@
 
   .barras{display:flex;align-items:flex-end;gap:6px;height:190px;padding:12px 0 0}
   .barra-col{flex:1;display:flex;flex-direction:column;height:100%;min-width:0}
-  .barra-topo{height:18px;text-align:center}
+  .barra-topo{height:18px;text-align:center;overflow:hidden;white-space:nowrap}
   .barra-val{font-family:var(--serif);font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--muted)}
   .barra-trilho{flex:1;display:flex;align-items:flex-end;background:#E7E9E3;border-radius:5px 5px 0 0}
   .barra-fill{width:100%;background:#8FA69C;border-radius:5px 5px 0 0}
   .barra-fill.alto{background:var(--ink)}
   .barra-rot{text-align:center;font-size:11.5px;color:var(--muted);padding-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .chart-toggle{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:10px 0 4px}
+  .chart-toggle-grupo{display:flex;gap:6px}
+
+  .pizza-row{display:flex;gap:28px;flex-wrap:wrap;align-items:center;padding:10px 0 4px}
+  .pizza-wrap{position:relative;width:176px;height:176px;flex-shrink:0}
+  .pizza-svg{width:176px;height:176px;display:block}
+  .pizza-svg circle{transition:opacity .15s}
+  .pizza-centro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;padding:0 30px}
+  .pizza-centro span{font-size:11px;color:var(--muted)}
+  .pizza-centro b{font-family:var(--serif);font-variant-numeric:tabular-nums;font-size:16px;line-height:1.2;margin-top:2px}
+  .pizza-legenda{flex:1;min-width:190px;display:flex;flex-direction:column;gap:9px}
+  .pizza-legenda-item{display:flex;align-items:center;gap:8px;font-size:13px}
+  .pizza-legenda-item .nome{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pizza-legenda-item .pct{color:var(--muted);font-size:12px;width:40px;text-align:right}
+
+  .mini-barras{display:flex;align-items:flex-end;gap:3px;height:36px}
+  .mini-barra-col{flex:1;height:100%;display:flex;align-items:flex-end;min-width:0}
+  .mini-barra-fill{width:100%;border-radius:2px 2px 0 0;min-height:2px}
 
   .tipos{display:flex;gap:16px;flex-wrap:wrap;padding:14px 0 2px}
   .tipo-bloco{flex:1;min-width:180px}
@@ -314,10 +335,13 @@
   .progresso-fill{height:100%;background:var(--ink);border-radius:999px}
   .progresso-fill.c-indigo{background:var(--indigo)}
   .progresso-fill.c-amber{background:var(--ambron)}
-  .fin-linha{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;color:var(--muted);padding:2px 0}
+  .fin-linha{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13.5px;color:var(--muted);padding:2px 0}
   .fin-linha span:first-child{color:var(--ink)}
+  .fin-linha>span{min-width:0;overflow-wrap:break-word}
 
   .tabela-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px}
+  .scroll-hint{display:none;font-size:11px;color:var(--muted);padding:4px 2px 0;text-align:right}
+  @media (max-width:620px){.scroll-hint{display:block}}
   .tabela-scroll table{min-width:560px}
 
   @media (max-width:620px){
@@ -330,11 +354,19 @@
     .hero{padding:22px 18px 20px;border-radius:var(--radius-md)}
     .hero-grid{gap:14px 22px}
     .aba{padding:8px 13px;font-size:13px}
+    .sec-head{flex-wrap:wrap}
+    .sec-head h2,.sec-total{font-size:17px}
     .barras{height:150px;gap:3px}
-    .barra-val{font-size:10px}
+    .barra-val{font-size:9px;letter-spacing:-0.02em}
     .barra-rot{font-size:10px}
     .topbar{padding:16px 0 12px}
     .import{padding:16px}
+    .arrow{width:38px;height:38px}
+    .pizza-wrap{margin:0 auto}
+    .pizza-row{justify-content:center}
+    .pizza-legenda-item .val{min-width:72px}
+    /* impede o iOS dar zoom automático ao focar um campo de texto (só acontece em fontes menores que 16px) */
+    .field input,.field select,textarea,#app .inline-val,.login-field input{font-size:16px}
   }
   @media (max-width:480px){
     .adder .field{flex:1 1 100%}
@@ -703,6 +735,68 @@
     return h+'</div>';
   }
 
+  // coluna, mas cada barra com sua própria cor — usado quando as barras
+  // representam categorias diferentes (não uma série no tempo)
+  function barrasCoradas(fatias){
+    var max=Math.max.apply(null,fatias.map(function(f){return f.valor;}).concat([1]));
+    var h='<div class="barras">';
+    fatias.forEach(function(f){
+      var alt=f.valor>0?Math.max(Math.round(f.valor/max*100),3):0;
+      h+='<div class="barra-col"'+(f.valor>0?' title="'+esc(f.label)+': '+money(f.valor)+'"':'')+'>';
+      h+='<div class="barra-topo">'+(f.valor>0?'<span class="barra-val">'+(f.valor>=1000?(Math.round(f.valor/100)/10).toLocaleString('pt-BR')+'k':Math.round(f.valor))+'</span>':'')+'</div>';
+      h+='<div class="barra-trilho"><div class="barra-fill" style="height:'+alt+'%;background:'+f.cor+'"></div></div>';
+      h+='<div class="barra-rot">'+esc(f.label)+'</div></div>';
+    });
+    return h+'</div>';
+  }
+
+  // gráfico de pizza (donut) em SVG puro, sem biblioteca — cada fatia é
+  // um círculo com stroke-dasharray/offset, técnica padrão pra donut
+  // multi-segmento sem precisar calcular arcos manualmente
+  function pizzaSVG(fatias,rotuloCentro){
+    var total=fatias.reduce(function(a,f){return a+f.valor;},0);
+    var r=64,circ=2*Math.PI*r,acc=0;
+    var svg='<svg viewBox="0 0 176 176" class="pizza-svg">';
+    svg+='<circle cx="88" cy="88" r="'+r+'" fill="none" stroke="var(--rule-soft)" stroke-width="24"></circle>';
+    fatias.forEach(function(f){
+      if(!(f.valor>0)) return;
+      var frac=f.valor/total, comp=frac*circ;
+      svg+='<circle cx="88" cy="88" r="'+r+'" fill="none" stroke="'+f.cor+'" stroke-width="24" '+
+        'stroke-dasharray="'+comp.toFixed(2)+' '+(circ-comp).toFixed(2)+'" '+
+        'stroke-dashoffset="'+(-acc).toFixed(2)+'" transform="rotate(-90 88 88)">'+
+        '<title>'+esc(f.label)+': '+money(f.valor)+' ('+(frac*100).toFixed(1)+'%)</title>'+
+        '</circle>';
+      acc+=comp;
+    });
+    svg+='</svg>';
+    var h='<div class="pizza-row"><div class="pizza-wrap">'+svg+
+      '<div class="pizza-centro"><span>'+esc(rotuloCentro)+'</span><b>'+money(total)+'</b></div></div>';
+    h+='<div class="pizza-legenda">';
+    fatias.filter(function(f){return f.valor>0;}).forEach(function(f){
+      h+='<div class="pizza-legenda-item"><span class="catdot" style="background:'+f.cor+'"></span>'+
+        '<span class="nome">'+esc(f.label)+'</span>'+
+        '<span class="pct">'+(total?(f.valor/total*100).toFixed(1):'0.0')+'%</span>'+
+        '<span class="val" style="min-width:88px;text-align:right">'+money(f.valor)+'</span></div>';
+    });
+    h+='</div></div>';
+    return h;
+  }
+
+  // mini gráfico de colunas (sem eixo/rótulo), usado dentro do card de
+  // cada ativo pra mostrar o rendimento dos últimos meses num relance
+  function miniBarrasInvest(hist,cor){
+    if(!hist||!hist.length) return '';
+    var ult=hist.slice(-6);
+    var max=Math.max.apply(null,ult.map(function(x){return Math.abs(x.rendimento);}).concat([0.01]));
+    var h='<div class="mini-barras">';
+    ult.forEach(function(x){
+      var alt=Math.max(Math.round(Math.abs(x.rendimento)/max*100),4);
+      h+='<div class="mini-barra-col" title="'+esc(nomeMesAno(x.mes))+': '+(x.rendimento>=0?'+':'')+money(x.rendimento)+'">';
+      h+='<div class="mini-barra-fill" style="height:'+alt+'%;background:'+(x.rendimento>=0?cor:'var(--red)')+'"></div></div>';
+    });
+    return h+'</div>';
+  }
+
   function viewJobs(){
     var idx=meses.indexOf(mesId);
     var ano=mesId.slice(0,4);
@@ -801,6 +895,7 @@
       h+='<td class="r val" style="font-weight:700;color:var(--azul)">'+money(totFal)+'</td>';
       h+='<td></td><td></td></tr></tfoot>';
       h+='</table></div>';
+      h+='<div class="scroll-hint">arraste a tabela pro lado para ver mais →</div>';
       h+='<div class="sec-note">Preencha “Recebido” conforme o cliente for pagando — não precisa ser tudo de uma vez, o valor fica somado até completar o orçamento.</div>';
     }
     h+='</section>';
@@ -867,6 +962,21 @@
   var COR_TIPO_INVEST={selic:'#2A5FA8',ipca:'#8C6712',txpre:'#35528F',cdb:'#2E6B4E',cdi:'#7A4FB0',acao:'#A8496B'};
   var ORDEM_TIPO_INVEST=['selic','ipca','txpre','cdb','cdi','acao'];
   var gruposInvestFechados={};
+  var vistaCarteiraInvest='pizza', agruparCarteiraInvest='tipo';
+  function fatiasCarteiraInvest(){
+    if(agruparCarteiraInvest==='ativo'){
+      return investimentos.map(function(inv){
+        var av=valorAtualInvest(inv);
+        var nome=inv.tipo==='acao'?(inv.ticker||'').toUpperCase():inv.nome;
+        return {label:nome, valor:av!=null?av:baseInvest(inv), cor:COR_TIPO_INVEST[inv.tipo]};
+      }).filter(function(f){return f.valor>0;}).sort(function(a,b){return b.valor-a.valor;});
+    }
+    return ORDEM_TIPO_INVEST.map(function(tipo){
+      var doTipo=investimentos.filter(function(i){return i.tipo===tipo;});
+      var valor=doTipo.reduce(function(a,i){var av=valorAtualInvest(i); return a+(av!=null?av:baseInvest(i));},0);
+      return {label:ROT_TIPO_INVEST[tipo], valor:valor, cor:COR_TIPO_INVEST[tipo]};
+    }).filter(function(f){return f.valor>0;});
+  }
   function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='ipca'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
   function ehPrefixado(inv){ return inv.tipo==='txpre'||(inv.tipo==='cdb'&&inv.rentabilidade==='pre'); }
   function serieDoInvest(inv){ if(inv.tipo==='selic') return mercado.selic; if(inv.tipo==='ipca') return mercado.ipca; return mercado.cdi; }
@@ -1137,6 +1247,12 @@
       var liq=valorLiquidoInvest(inv), dias=diasCorridosInvest(inv);
       c+='<div class="fin-linha"><span>Valor líquido estimado</span><span>'+money(liq)+' <span class="dim" style="font-size:11px">('+aliquotaIR(dias)+'% IR'+(percIOF(dias)?' + IOF':'')+')</span></span></div>';
     }
+    if(ehRendaFixaInv(inv)){
+      var histInv=historicoInvest(inv);
+      if(histInv.length){
+        c+='<div style="margin-top:8px"><div class="dim" style="font-size:11px;margin-bottom:3px">Rendimento mensal (últimos '+Math.min(histInv.length,6)+' meses)</div>'+miniBarrasInvest(histInv,COR_TIPO_INVEST[inv.tipo])+'</div>';
+      }
+    }
     c+='<div class="adder" style="border-top:1px solid var(--rule-soft);margin-top:10px;padding-top:12px">';
     c+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
     c+='</div></div></div>';
@@ -1168,6 +1284,23 @@
       h+='<div class="hero-cell"><span>Cotações atualizadas</span><b>'+(mercado.atualizadoEm?dataCurta(mercado.atualizadoEm.slice(0,10))+' '+new Date(mercado.atualizadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'ainda não')+'</b></div></div>';
     }
     h+='</div>';
+
+    if(investimentos.length){
+      var fatiasCart=fatiasCarteiraInvest();
+      h+='<section><div class="sec-head"><h2>Composição da carteira</h2></div>';
+      h+='<div class="chart-toggle">';
+      h+='<div class="chart-toggle-grupo">';
+      [['pizza','Pizza'],['coluna','Colunas']].forEach(function(o){
+        h+='<button class="fchip" data-set-vista-carteira="'+o[0]+'" aria-pressed="'+(vistaCarteiraInvest===o[0])+'">'+o[1]+'</button>';
+      });
+      h+='</div><div class="chart-toggle-grupo">';
+      [['tipo','Por tipo'],['ativo','Por ativo']].forEach(function(o){
+        h+='<button class="fchip" data-set-agrupar-carteira="'+o[0]+'" aria-pressed="'+(agruparCarteiraInvest===o[0])+'">'+o[1]+'</button>';
+      });
+      h+='</div></div>';
+      h+= vistaCarteiraInvest==='pizza' ? pizzaSVG(fatiasCart,'Valor atual') : barrasCoradas(fatiasCart);
+      h+='</section>';
+    }
 
     h+='<section><div class="sec-head"><h2>Carteira</h2><span class="sec-total">'+money(totalAtual)+'</span></div>';
 
@@ -1227,18 +1360,26 @@
     }
     h+='</section>';
 
+    if(investimentos.length){
+      h+='<section style="margin-top:22px"><div class="sec-head"><h2>Aplicado × atual × líquido — carteira inteira</h2></div>';
+      h+=barrasCoradas([
+        {label:'Aplicado', valor:totalAplicado, cor:'#8FA69C'},
+        {label:'Atual (bruto)', valor:totalAtual, cor:'var(--azul)'},
+        {label:'Líquido estimado', valor:totalLiquido, cor:'var(--green)'}
+      ]);
+      h+='<div class="sec-note">Resumo de tudo que está cadastrado (renda fixa + ações). "Líquido estimado" usa o valor bruto das ações, já que a isenção de IR delas não dá pra calcular por ativo isolado.</div>';
+      h+='</section>';
+    }
+
     if(comValor.filter(ehRendaFixaInv).length){
       var hist=rendimentoMensalTotal();
       h+='<section style="margin-top:22px"><div class="sec-head"><h2>Rendimento mês a mês (renda fixa)</h2></div>';
       if(!hist.length){
         h+='<div class="vazio">Sem histórico ainda — atualize as cotações.</div>';
       }else{
-        h+='<table><thead><tr><th>Mês</th><th class="r">Rendimento</th></tr></thead><tbody>';
-        hist.slice(-12).forEach(function(x){
-          h+='<tr><td class="dim val">'+esc(nomeMesAno(x.mes))+'</td><td class="r val" style="color:var(--green)">+'+money(x.rendimento)+'</td></tr>';
-        });
-        h+='</tbody></table>';
-        h+='<div class="sec-note">Soma do rendimento de todos os ativos de Selic/CDB/CDI naquele mês.</div>';
+        var histUlt=hist.slice(-12);
+        h+=barras(histUlt.map(function(x){return x.rendimento;}), histUlt.map(function(x){return nomeMesAno(x.mes);}), histUlt.length-1);
+        h+='<div class="sec-note">Soma do rendimento de todos os ativos de Selic/IPCA+/CDB/CDI naquele mês (não inclui ações, que não têm histórico mensal disponível).</div>';
       }
       h+='</section>';
 
@@ -1685,6 +1826,8 @@
       gruposInvestFechados[tg]=!gruposInvestFechados[tg];
       render(); return;
     }
+    if(t.dataset.setVistaCarteira){ vistaCarteiraInvest=t.dataset.setVistaCarteira; render(); return; }
+    if(t.dataset.setAgruparCarteira){ agruparCarteiraInvest=t.dataset.setAgruparCarteira; render(); return; }
     if(t.dataset.del==='job'){
       jobs=jobs.filter(function(x){return x.id!==t.dataset.id;});
       await sset(KEY_JOBS,jobs); render(); return;
