@@ -55,22 +55,36 @@ async function buscarSerieBCB(codigo, desde) {
   });
 }
 
+// O plano gratuito da brapi.dev só permite 1 ativo por chamada (lote de
+// vários juntos só é liberado a partir do plano Startup, pago) — então
+// buscamos um ticker de cada vez. Se um ticker falhar (nome errado, por
+// exemplo), os outros continuam funcionando normalmente.
 async function buscarAcoes(tickers, token) {
-  const url = 'https://brapi.dev/api/quote/' + tickers.join(',') + (token ? '?token=' + encodeURIComponent(token) : '');
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (!resp.ok || data.error) {
-    throw new Error((data && data.message) || ('brapi.dev respondeu ' + resp.status + '. Tickers fora de PETR4/MGLU3/VALE3/ITUB4 exigem BRAPI_TOKEN configurado na Vercel.'));
-  }
   const out = {};
-  (data.results || []).forEach(function (r) {
-    out[r.symbol] = {
-      preco: r.regularMarketPrice,
-      nome: r.shortName || r.longName || r.symbol,
-      variacaoPercent: typeof r.regularMarketChangePercent === 'number' ? r.regularMarketChangePercent : null,
-      atualizadoEm: new Date().toISOString()
-    };
-  });
+  const falhas = [];
+  for (const ticker of tickers) {
+    const url = 'https://brapi.dev/api/quote/' + encodeURIComponent(ticker) + (token ? '?token=' + encodeURIComponent(token) : '');
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (!resp.ok || data.error || !(data.results && data.results.length)) {
+        falhas.push(ticker + ': ' + ((data && data.message) || ('HTTP ' + resp.status)));
+        continue;
+      }
+      const r = data.results[0];
+      out[r.symbol] = {
+        preco: r.regularMarketPrice,
+        nome: r.shortName || r.longName || r.symbol,
+        variacaoPercent: typeof r.regularMarketChangePercent === 'number' ? r.regularMarketChangePercent : null,
+        atualizadoEm: new Date().toISOString()
+      };
+    } catch (e) {
+      falhas.push(ticker + ': falha de rede');
+    }
+  }
+  if (!Object.keys(out).length && falhas.length) {
+    throw new Error(falhas.join(' · '));
+  }
   return out;
 }
 
