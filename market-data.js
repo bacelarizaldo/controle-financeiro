@@ -74,11 +74,21 @@ async function buscarAcoes(tickers, token) {
 
 // Lista de títulos do Tesouro Direto com preço unitário do dia — fonte
 // oficial pública, mesmo JSON que o site tesourodireto.com.br consome.
+// Esse endpoint não é documentado oficialmente e costuma recusar pedidos
+// sem cara de navegador, então mandamos os cabeçalhos que ele espera.
 async function buscarTesouroDireto() {
-  const resp = await fetch('https://www.tesourodireto.com.br/json/br/com/b3/tesourodireto/service/api/treasurybondsinfo.json');
-  if (!resp.ok) throw new Error('Tesouro Direto respondeu ' + resp.status + '.');
+  const resp = await fetch('https://www.tesourodireto.com.br/json/br/com/b3/tesourodireto/service/api/treasurybondsinfo.json', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+      'Referer': 'https://www.tesourodireto.com.br/titulos/precos-e-taxas.htm'
+    }
+  });
+  if (!resp.ok) throw new Error('Tesouro Direto respondeu ' + resp.status + ' (esse endpoint não é oficial e às vezes fica instável).');
   const data = await resp.json();
   const lista = (data.response && data.response.TrsrBdTradgList) || [];
+  if (!lista.length) throw new Error('Tesouro Direto retornou uma lista vazia de títulos.');
   return lista.map(function (item) {
     const b = item.TrsrBd || {};
     return {
