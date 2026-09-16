@@ -406,7 +406,7 @@
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
-  var investimentos=[], mercado={cdi:[],selic:[],acoes:{},atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
+  var investimentos=[], mercado={cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
   var KEY_INVEST='fin:investimentos', KEY_MERCADO='fin:mercado_cache';
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
@@ -854,7 +854,9 @@
   function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
   function ehPrefixado(inv){ return inv.tipo==='txpre'||(inv.tipo==='cdb'&&inv.rentabilidade==='pre'); }
   function serieDoInvest(inv){ return inv.tipo==='selic' ? mercado.selic : mercado.cdi; }
-  function mesesDesde(mesIni,mesFim){ var out=[],cur=mesIni; while(cur<=mesFim){ out.push(cur); cur=proxId(cur); } return out; }
+  function hojeISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function diasEntre(d1,d2){ return Math.round((new Date(d2+'T00:00:00')-new Date(d1+'T00:00:00'))/86400000); }
+  function fimDoMesISO(mesId2){ var p=mesId2.split('-'),y=+p[0],m=+p[1]; var ultimo=new Date(y,m,0).getDate(); return mesId2+'-'+String(ultimo).padStart(2,'0'); }
   function diasParaVencimento(venc){
     if(!venc) return null;
     var hoje=new Date(); hoje.setHours(0,0,0,0);
@@ -863,16 +865,23 @@
   }
 
   // histórico mês a mês de um prefixado — não depende de dado de mercado
-  // nenhum, é só compor a taxa anual contratada mês a mês
+  // nenhum, compõe a taxa anual contratada dia a dia (dias corridos, igual
+  // o Tesouro Direto/corretora fazem), não por mês-calendário fechado
   function historicoPrefixado(inv){
-    var mesIni=(inv.data||'').slice(0,7), mesFim=hojeId();
-    var taxaMes=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/12)-1;
-    var valor=+inv.valorAplicado||0, out=[];
-    mesesDesde(mesIni,mesFim).forEach(function(m){
-      var rend=valor*taxaMes;
-      valor+=rend;
-      out.push({mes:m, rendimento:rend, acumulado:valor});
-    });
+    var dataIni=inv.data; if(!dataIni) return [];
+    var hoje=hojeISO();
+    if(dataIni>=hoje) return [];
+    var taxaDia=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/365)-1;
+    var base=+inv.valorAplicado||0, out=[], mes=dataIni.slice(0,7), valorAnterior=base;
+    while(mes<=hoje.slice(0,7)){
+      var fimMes=fimDoMesISO(mes);
+      var corte=fimMes<hoje?fimMes:hoje;
+      var dias=diasEntre(dataIni,corte);
+      var valorAcum=base*Math.pow(1+taxaDia,dias);
+      out.push({mes:mes, rendimento:valorAcum-valorAnterior, acumulado:valorAcum});
+      valorAnterior=valorAcum;
+      mes=proxId(mes);
+    }
     return out;
   }
   // histórico mês a mês de um pós-fixado, aplicando a taxa acumulada
@@ -891,10 +900,41 @@
   }
   function historicoInvest(inv){ return ehPrefixado(inv)?historicoPrefixado(inv):historicoPosFixado(inv); }
 
-  // valor atual de um investimento de renda fixa — prefixado usa a taxa
-  // contratada (sempre disponível); pós-fixado depende da série do BCB
-  // já ter sido buscada em "Atualizar cotações"
+  // acha, na lista de títulos do Tesouro Direto trazida por "Atualizar
+  // cotações", o título que corresponde a este investimento — casando
+  // por vencimento (data exata) e por tipo (Selic x Prefixado)
+  function tituloCorresponde(t,inv){
+    if(!t||!inv.vencimento||t.vencimento!==inv.vencimento) return false;
+    var n=(t.nome||'').toLowerCase();
+    if(inv.tipo==='selic') return n.indexOf('selic')>-1;
+    if(inv.tipo==='txpre') return n.indexOf('prefixado')>-1 && n.indexOf('juros semestrais')===-1;
+    return false;
+  }
+  function tituloDoInvest(inv){
+    if(!mercado.tesouro||!mercado.tesouro.length) return null;
+    for(var i=0;i<mercado.tesouro.length;i++){ if(tituloCorresponde(mercado.tesouro[i],inv)) return mercado.tesouro[i]; }
+    return null;
+  }
+  // valor real de mercado (PU de resgate de hoje × quantidade de
+  // títulos) — só existe se a pessoa informou a quantidade de títulos E
+  // o Tesouro Direto ainda lista esse título hoje
+  function valorAtualTesouroPU(inv){
+    if(!inv.quantidadeTitulos) return null;
+    var t=tituloDoInvest(inv);
+    if(!t||typeof t.precoResgate!=='number') return null;
+    return (+inv.quantidadeTitulos)*t.precoResgate;
+  }
+
+  // valor atual de um investimento de renda fixa — Tesouro Selic/Prefixado
+  // usa o preço unitário real de resgate quando a quantidade de títulos
+  // foi informada (marcação a mercado de verdade); senão cai pra
+  // estimativa por taxa: prefixado usa a taxa contratada (sempre
+  // disponível), pós-fixado depende da série do BCB já ter sido buscada
   function valorAtualRendaFixa(inv){
+    if(inv.tipo==='selic'||inv.tipo==='txpre'){
+      var pu=valorAtualTesouroPU(inv);
+      if(pu!=null) return pu;
+    }
     if(ehPrefixado(inv)){
       var histP=historicoPrefixado(inv);
       return histP.length?histP[histP.length-1].acumulado:(+inv.valorAplicado||0);
@@ -960,19 +1000,24 @@
       var minData=rf.reduce(function(m,i){return (!m||i.data<m)?i.data:m;},null);
       var acoes=investimentos.filter(function(i){return i.tipo==='acao'&&i.ticker;});
       var tickers=Array.from(new Set(acoes.map(function(i){return i.ticker.toUpperCase();})));
+      var temTesouro=investimentos.some(function(i){return i.tipo==='selic'||i.tipo==='txpre';});
 
       var pCdi=fetch('/api/market-data?tipo=cdi'+(minData?'&desde='+minData:'')).then(function(r){return r.json();});
       var pSelic=fetch('/api/market-data?tipo=selic'+(minData?'&desde='+minData:'')).then(function(r){return r.json();});
       var pAcoes=tickers.length
         ? fetch('/api/market-data?tipo=acao&ticker='+encodeURIComponent(tickers.join(','))).then(function(r){return r.json();})
         : Promise.resolve({cotacoes:{}});
+      var pTesouro=temTesouro
+        ? fetch('/api/market-data?tipo=tesouro').then(function(r){return r.json();})
+        : Promise.resolve({titulos:mercado.tesouro});
 
-      var res=await Promise.all([pCdi,pSelic,pAcoes]);
-      var erro=res[0].error||res[1].error||res[2].error;
+      var res=await Promise.all([pCdi,pSelic,pAcoes,pTesouro]);
+      var erro=res[0].error||res[1].error||res[2].error||res[3].error;
       mercado={
         cdi: res[0].serie||mercado.cdi,
         selic: res[1].serie||mercado.selic,
         acoes: Object.assign({},mercado.acoes,res[2].cotacoes||{}),
+        tesouro: res[3].titulos||mercado.tesouro,
         atualizadoEm: new Date().toISOString()
       };
       await sset(KEY_MERCADO,mercado);
@@ -1017,6 +1062,9 @@
     }else{
       h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="'+(tipoNovoInvest==='txpre'?'Ex.: Prefixado 2029':'Ex.: CDB Banco X')+'"></div>';
       h+='<div class="field"><label for="nvi-val">Valor aplicado</label><input id="nvi-val" class="w-val" placeholder="R$ 0,00"></div>';
+      if(tipoNovoInvest==='selic'||tipoNovoInvest==='txpre'){
+        h+='<div class="field"><label for="nvi-qtdtit">Qtd. de títulos</label><input id="nvi-qtdtit" style="width:80px;text-align:right" placeholder="Ex.: 2,78"></div>';
+      }
       if(tipoNovoInvest==='cdb'){
         h+='<div class="field"><label for="nvi-rent">Rentabilidade</label><select id="nvi-rent">'+
           '<option value="pos"'+(rentNovoInvest==='pos'?' selected':'')+'>Pós-fixado (% do CDI)</option>'+
@@ -1055,6 +1103,14 @@
             var dv=diasParaVencimento(inv.vencimento);
             h+='<div class="fin-linha"><span>Vencimento</span><span>'+esc(dataCurta(inv.vencimento))+(dv==null?'':(dv<0?' (vencido)':' (em '+dv+' dias)'))+'</span></div>';
           }
+          if(inv.tipo==='selic'||inv.tipo==='txpre'){
+            if(inv.quantidadeTitulos){
+              var t=tituloDoInvest(inv);
+              h+='<div class="fin-linha"><span>'+(+inv.quantidadeTitulos)+' título(s)</span><span>'+(t?('PU de resgate hoje: '+money(t.precoResgate)):'Título não encontrado na lista de hoje — usando estimativa por taxa')+'</span></div>';
+            }else{
+              h+='<div class="fin-linha"><span style="color:var(--muted);font-size:12px">Sem quantidade de títulos cadastrada — usando estimativa por taxa, não o preço real de mercado</span></div>';
+            }
+          }
         }
         if(inv.obs) h+='<div class="fin-linha" style="padding-top:2px"><span style="color:var(--muted);font-style:italic">'+esc(inv.obs)+'</span></div>';
         h+='<div class="fin-linha"><span>Rendimento</span><span>'+(rend.valor!=null?'<span class="chip '+(rend.valor>=0?'ganho':'perda')+'">'+(rend.valor>=0?'+':'')+money(rend.valor)+' ('+(rend.pct>=0?'+':'')+rend.pct.toFixed(2)+'%)</span>':'Clique em “Atualizar cotações”')+'</span></div>';
@@ -1062,7 +1118,7 @@
         h+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
         h+='</div></div></div>';
       });
-      h+='<div class="sec-note">Prefixados (CDB e Tesouro Prefixado) usam a taxa contratada compondo mês a mês — é o valor "se segurar até o vencimento", não a marcação a mercado do dia a dia (por isso pode não bater com o que a corretora mostra, principalmente no Tesouro Prefixado). Selic/CDI e CDB pós-fixado são calculados mês a mês pela taxa oficial do Banco Central vezes o percentual contratado — clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
+      h+='<div class="sec-note">Tesouro Selic e Tesouro Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
     }
     h+='</section>';
 
@@ -1656,6 +1712,10 @@
         var vvi=parseNum(document.getElementById('nvi-val').value);
         if(!nvn||!vvi){ toast('Preencha o nome e o valor aplicado.'); return; }
         novoInv.nome=nvn; novoInv.valorAplicado=vvi;
+        if(tpi==='selic'||tpi==='txpre'){
+          var qtit=parseNum(document.getElementById('nvi-qtdtit').value);
+          if(qtit) novoInv.quantidadeTitulos=qtit;
+        }
         novoInv.instituicao=document.getElementById('nvi-instituicao').value.trim();
         novoInv.vencimento=document.getElementById('nvi-venc').value||'';
         novoInv.liquidez=document.getElementById('nvi-liquidez').value;
@@ -1813,7 +1873,7 @@
     await corrigirMarco();
     financ=await sget(KEY_FIN)||[];
     investimentos=await sget(KEY_INVEST)||[];
-    mercado=await sget(KEY_MERCADO)||{cdi:[],selic:[],acoes:{},atualizadoEm:null};
+    mercado=await sget(KEY_MERCADO)||{cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null};
     if(!meses.length){ await sset(keyMes('2026-08'),mesNovo('2026-08',cfg)); meses=['2026-08']; }
     var alvo=meses.indexOf(hojeId())>-1?hojeId():meses[meses.length-1];
     mesId=alvo; mes=await sget(keyMes(alvo))||mesNovo(alvo,cfg);

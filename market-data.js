@@ -1,10 +1,14 @@
 // Dados de mercado para a aba Investimentos.
 // - CDI e Selic: série mensal acumulada direto do Banco Central (SGS),
 //   pública, sem chave. CDI = série 4391, Selic = série 4390 (% ao mês).
+// - Tesouro Direto: preço unitário (PU) de compra/resgate do dia, via o
+//   próprio JSON público que o site tesourodireto.com.br usa — gratuito,
+//   sem chave, sem precisar de plano pago. É o dado de marcação a mercado
+//   real (o que você receberia resgatando hoje).
 // - Ações: cotação via brapi.dev. PETR4/MGLU3/VALE3/ITUB4 funcionam sem
 //   token; qualquer outro ticker precisa da variável BRAPI_TOKEN.
 // Tudo fica em cache no mesmo Postgres do app, pra não bater na API
-// externa a cada clique — CDI/Selic ficam 12h em cache, ações 30min.
+// externa a cada clique.
 const { sql } = require('@vercel/postgres');
 const { exigirAuth } = require('./_auth');
 
@@ -68,6 +72,26 @@ async function buscarAcoes(tickers, token) {
   return out;
 }
 
+// Lista de títulos do Tesouro Direto com preço unitário do dia — fonte
+// oficial pública, mesmo JSON que o site tesourodireto.com.br consome.
+async function buscarTesouroDireto() {
+  const resp = await fetch('https://www.tesourodireto.com.br/json/br/com/b3/tesourodireto/service/api/treasurybondsinfo.json');
+  if (!resp.ok) throw new Error('Tesouro Direto respondeu ' + resp.status + '.');
+  const data = await resp.json();
+  const lista = (data.response && data.response.TrsrBdTradgList) || [];
+  return lista.map(function (item) {
+    const b = item.TrsrBd || {};
+    return {
+      nome: b.nm || '',
+      vencimento: String(b.mtrtyDt || '').slice(0, 10),
+      precoCompra: b.untrInvstmtVal,
+      precoResgate: b.untrRedVal,
+      taxaCompra: b.anulInvstmtRate,
+      taxaResgate: b.anulRedRate
+    };
+  });
+}
+
 module.exports = async function handler(req, res) {
   if (!exigirAuth(req, res)) return;
   if (req.method !== 'GET') {
@@ -101,7 +125,13 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    res.status(400).json({ error: 'Parâmetro "tipo" inválido — use cdi, selic ou acao.' });
+    if (tipo === 'tesouro') {
+      const lista = await doCache('tesouro:lista', 60 * 60 * 1000, buscarTesouroDireto);
+      res.status(200).json({ tipo: 'tesouro', titulos: lista });
+      return;
+    }
+
+    res.status(400).json({ error: 'Parâmetro "tipo" inválido — use cdi, selic, tesouro ou acao.' });
   } catch (err) {
     res.status(500).json({ error: String((err && err.message) || err) });
   }
