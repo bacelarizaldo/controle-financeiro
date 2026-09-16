@@ -880,6 +880,40 @@
     return Math.round((v-hoje)/86400000);
   }
 
+  // impostos de renda fixa (Selic, IPCA+, Prefixado, CDB, CDI) — não se
+  // aplica a ações, que têm regra de IR totalmente diferente (isenção
+  // por venda mensal até R$20mil), não modelada aqui.
+  // IOF regressivo — só pesa em resgates com menos de 30 dias corridos
+  // (Decreto 6.306/2007, Anexo). Do dia 30 em diante é sempre zero.
+  var TABELA_IOF=[96,93,90,86,83,80,76,73,70,66,63,60,56,53,50,46,43,40,36,33,30,26,23,20,16,13,10,6,3];
+  function percIOF(diasCorridos){
+    if(diasCorridos>=30||diasCorridos<1) return 0;
+    return TABELA_IOF[diasCorridos-1];
+  }
+  // IR regressivo de renda fixa (Lei 11.033/2004) — cai conforme o tempo
+  // de aplicação, corridos desde a data de compra até hoje.
+  function aliquotaIR(diasCorridos){
+    if(diasCorridos<=180) return 22.5;
+    if(diasCorridos<=360) return 20;
+    if(diasCorridos<=720) return 17.5;
+    return 15;
+  }
+  function diasCorridosInvest(inv){ return Math.max(diasEntre(inv.data,hojeISO()),0); }
+  // valor líquido estimado — desconta IOF (se houver) e IR regressivo
+  // sobre o rendimento bruto. Não inclui a taxa de custódia da B3, que
+  // é pequena e tem regras de isenção que mudam com frequência.
+  function valorLiquidoInvest(inv){
+    if(!ehRendaFixaInv(inv)) return null;
+    var bruto=valorAtualInvest(inv);
+    if(bruto==null) return null;
+    var rendimentoBruto=bruto-baseInvest(inv);
+    if(rendimentoBruto<=0) return bruto;
+    var dias=diasCorridosInvest(inv);
+    var iof=rendimentoBruto*(percIOF(dias)/100);
+    var ir=(rendimentoBruto-iof)*(aliquotaIR(dias)/100);
+    return bruto-iof-ir;
+  }
+
   // histórico mês a mês de um prefixado — não depende de dado de mercado
   // nenhum, compõe a taxa anual contratada dia a dia (dias corridos, igual
   // o Tesouro Direto/corretora fazem), não por mês-calendário fechado
@@ -1099,6 +1133,10 @@
     }
     if(inv.obs) c+='<div class="fin-linha" style="padding-top:2px"><span style="color:var(--muted);font-style:italic">'+esc(inv.obs)+'</span></div>';
     c+='<div class="fin-linha"><span>Rendimento</span><span>'+(rend.valor!=null?'<span class="chip '+(rend.valor>=0?'ganho':'perda')+'">'+(rend.valor>=0?'+':'')+money(rend.valor)+' ('+(rend.pct>=0?'+':'')+rend.pct.toFixed(2)+'%)</span>':'Clique em “Atualizar cotações”')+'</span></div>';
+    if(ehRendaFixaInv(inv)&&atual!=null){
+      var liq=valorLiquidoInvest(inv), dias=diasCorridosInvest(inv);
+      c+='<div class="fin-linha"><span>Valor líquido estimado</span><span>'+money(liq)+' <span class="dim" style="font-size:11px">('+aliquotaIR(dias)+'% IR'+(percIOF(dias)?' + IOF':'')+')</span></span></div>';
+    }
     c+='<div class="adder" style="border-top:1px solid var(--rule-soft);margin-top:10px;padding-top:12px">';
     c+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
     c+='</div></div></div>';
@@ -1111,6 +1149,11 @@
     var totalAtual=investimentos.reduce(function(a,i){return a+(valorAtualInvest(i)!=null?valorAtualInvest(i):baseInvest(i));},0);
     var totalRend=totalAtual-totalAplicado;
     var pctRend=totalAplicado?(totalAtual/totalAplicado-1)*100:0;
+    var totalLiquido=investimentos.reduce(function(a,i){
+      var av=valorAtualInvest(i);
+      if(av==null) return a+baseInvest(i);
+      return a+(ehRendaFixaInv(i)?valorLiquidoInvest(i):av);
+    },0);
     var h='';
 
     h+='<div class="topbar"><div class="mesnav"><h1 style="min-width:auto">Investimentos</h1></div>';
@@ -1121,6 +1164,7 @@
     h+='<div class="hero-sub">'+(investimentos.length?('Aplicado: '+money(totalAplicado)+' · Rendimento: '+(totalRend>=0?'+':'')+money(totalRend)+' ('+(pctRend>=0?'+':'')+pctRend.toFixed(2)+'%)'):'Cadastre seus investimentos (Selic, IPCA+, CDB, CDI, ações) pra acompanhar o rendimento aqui.')+'</div>';
     if(investimentos.length){
       h+='<div class="hero-grid"><div class="hero-cell"><span>Ativos cadastrados</span><b>'+investimentos.length+'</b></div>';
+      h+='<div class="hero-cell"><span>Valor líquido estimado</span><b>'+money(totalLiquido)+'</b></div>';
       h+='<div class="hero-cell"><span>Cotações atualizadas</span><b>'+(mercado.atualizadoEm?dataCurta(mercado.atualizadoEm.slice(0,10))+' '+new Date(mercado.atualizadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'ainda não')+'</b></div></div>';
     }
     h+='</div>';
@@ -1179,7 +1223,7 @@
         h+='</button>';
         if(!fechado) doTipo.forEach(function(inv){ h+=cardInvestHTML(inv); });
       });
-      h+='<div class="sec-note">Tesouro Selic, IPCA+ e Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
+      h+='<div class="sec-note">Tesouro Selic, IPCA+ e Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.<br>O "valor líquido estimado" já desconta IR e IOF regressivos (tabela oficial, pelos dias corridos desde a compra) da renda fixa — mas não inclui a taxa de custódia da B3, que é pequena e muda de regra com frequência. Ações não têm estimativa de líquido aqui, porque a isenção de IR delas depende do total vendido no mês, não dá pra calcular por ativo isolado.</div>';
     }
     h+='</section>';
 
