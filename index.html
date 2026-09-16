@@ -992,6 +992,18 @@
     return lista.reduce(function(a,inv){return a+projecaoInvestRendaFixa(inv,mesesAFrente);},0);
   }
 
+  // Busca uma URL de mercado sem nunca lançar exceção — devolve
+  // {error: '...'} em vez de rejeitar, pra uma fonte falhando não
+  // esconder o resultado nem o erro das outras.
+  async function buscarMercado(url){
+    var r;
+    try{ r=await fetch(url); }catch(e){ return {error:'falha de rede'}; }
+    var data=null;
+    try{ data=await r.json(); }catch(e){ return {error:'resposta inválida do servidor (HTTP '+r.status+')'}; }
+    if(!r.ok) return {error:(data&&data.error)||('HTTP '+r.status)};
+    return data;
+  }
+
   async function atualizarMercado(){
     if(atualizandoMercado) return;
     atualizandoMercado=true;
@@ -1002,26 +1014,27 @@
       var tickers=Array.from(new Set(acoes.map(function(i){return i.ticker.toUpperCase();})));
       var temTesouro=investimentos.some(function(i){return i.tipo==='selic'||i.tipo==='txpre';});
 
-      var pCdi=fetch('/api/market-data?tipo=cdi'+(minData?'&desde='+minData:'')).then(function(r){return r.json();});
-      var pSelic=fetch('/api/market-data?tipo=selic'+(minData?'&desde='+minData:'')).then(function(r){return r.json();});
-      var pAcoes=tickers.length
-        ? fetch('/api/market-data?tipo=acao&ticker='+encodeURIComponent(tickers.join(','))).then(function(r){return r.json();})
-        : Promise.resolve({cotacoes:{}});
-      var pTesouro=temTesouro
-        ? fetch('/api/market-data?tipo=tesouro').then(function(r){return r.json();})
-        : Promise.resolve({titulos:mercado.tesouro});
+      var chamadas=[
+        {nome:'CDI', chave:'cdi', url:'/api/market-data?tipo=cdi'+(minData?'&desde='+minData:'')},
+        {nome:'Selic', chave:'selic', url:'/api/market-data?tipo=selic'+(minData?'&desde='+minData:'')}
+      ];
+      if(tickers.length) chamadas.push({nome:'Ações', chave:'acao', url:'/api/market-data?tipo=acao&ticker='+encodeURIComponent(tickers.join(','))});
+      if(temTesouro) chamadas.push({nome:'Tesouro Direto', chave:'tesouro', url:'/api/market-data?tipo=tesouro'});
 
-      var res=await Promise.all([pCdi,pSelic,pAcoes,pTesouro]);
-      var erro=res[0].error||res[1].error||res[2].error||res[3].error;
+      var resultados=await Promise.all(chamadas.map(function(c){ return buscarMercado(c.url); }));
+      var porChave={};
+      var falhas=[];
+      chamadas.forEach(function(c,i){ porChave[c.chave]=resultados[i]; if(resultados[i].error) falhas.push(c.nome+': '+resultados[i].error); });
+
       mercado={
-        cdi: res[0].serie||mercado.cdi,
-        selic: res[1].serie||mercado.selic,
-        acoes: Object.assign({},mercado.acoes,res[2].cotacoes||{}),
-        tesouro: res[3].titulos||mercado.tesouro,
+        cdi: (porChave.cdi&&porChave.cdi.serie)||mercado.cdi,
+        selic: (porChave.selic&&porChave.selic.serie)||mercado.selic,
+        acoes: Object.assign({},mercado.acoes,(porChave.acao&&porChave.acao.cotacoes)||{}),
+        tesouro: (porChave.tesouro&&porChave.tesouro.titulos)||mercado.tesouro,
         atualizadoEm: new Date().toISOString()
       };
       await sset(KEY_MERCADO,mercado);
-      toast(erro?('Atualizado com um aviso: '+erro):'Cotações atualizadas.');
+      toast(falhas.length?('Atualizado com avisos — '+falhas.join(' · ')):'Cotações atualizadas.');
     }catch(e){
       toast('Não consegui atualizar as cotações agora. Tente de novo em instantes.');
     }
