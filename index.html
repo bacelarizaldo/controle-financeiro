@@ -262,6 +262,11 @@
   .conta-body h4{margin:14px 0 2px;font-size:12.5px;color:var(--muted);font-weight:600}
   .conta-body h4:first-child{margin-top:10px}
 
+  .grupo-invest-head{display:flex;align-items:center;gap:8px;width:100%;margin:20px 0 8px;padding:10px 12px;border:none;background:var(--card);border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);font-size:13px;color:var(--ink);font-weight:600;text-align:left;transition:box-shadow .15s}
+  .grupo-invest-head:hover{box-shadow:var(--shadow-md)}
+  .grupo-invest-nome{flex:1}
+  .grupo-invest-seta{color:var(--muted);font-size:11px;width:12px;text-align:center}
+
   .filtros{display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 4px}
   .fchip{border:1px solid var(--rule);background:transparent;border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--muted);transition:background .15s,color .15s}
   .fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
@@ -859,6 +864,7 @@
   var CHIP_TIPO_INVEST={selic:'inv-selic',txpre:'inv-txpre',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
   var COR_TIPO_INVEST={selic:'#2A5FA8',txpre:'#35528F',cdb:'#2E6B4E',cdi:'#7A4FB0',acao:'#A8496B'};
   var ORDEM_TIPO_INVEST=['selic','txpre','cdb','cdi','acao'];
+  var gruposInvestFechados={};
   function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='txpre'||i.tipo==='cdb'||i.tipo==='cdi'; }
   function ehPrefixado(inv){ return inv.tipo==='txpre'||(inv.tipo==='cdb'&&inv.rentabilidade==='pre'); }
   function serieDoInvest(inv){ return inv.tipo==='selic' ? mercado.selic : mercado.cdi; }
@@ -1158,9 +1164,14 @@
         var doTipo=investimentos.filter(function(i){return i.tipo===tipo;}).sort(function(a,b){return (a.data||'').localeCompare(b.data||'');});
         if(!doTipo.length) return;
         var totTipo=doTipo.reduce(function(a,i){var av=valorAtualInvest(i); return a+(av!=null?av:baseInvest(i));},0);
-        h+='<h4 style="display:flex;align-items:center;gap:7px;margin:20px 0 8px;font-size:13px;color:var(--ink);font-weight:600">';
-        h+='<span class="catdot" style="background:'+COR_TIPO_INVEST[tipo]+'"></span>'+ROT_TIPO_INVEST[tipo]+' ('+doTipo.length+') <span class="dim" style="font-weight:500">· '+money(totTipo)+'</span></h4>';
-        doTipo.forEach(function(inv){ h+=cardInvestHTML(inv); });
+        var fechado=!!gruposInvestFechados[tipo];
+        h+='<button type="button" class="grupo-invest-head" data-toggle-grupo="'+tipo+'" aria-expanded="'+(!fechado)+'">';
+        h+='<span class="catdot" style="background:'+COR_TIPO_INVEST[tipo]+'"></span>';
+        h+='<span class="grupo-invest-nome">'+ROT_TIPO_INVEST[tipo]+' ('+doTipo.length+')</span>';
+        h+='<span class="dim" style="font-weight:500">'+money(totTipo)+'</span>';
+        h+='<span class="grupo-invest-seta">'+(fechado?'▸':'▾')+'</span>';
+        h+='</button>';
+        if(!fechado) doTipo.forEach(function(inv){ h+=cardInvestHTML(inv); });
       });
       h+='<div class="sec-note">Tesouro Selic e Tesouro Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
     }
@@ -1618,6 +1629,11 @@
     if(t.dataset.toggle){
       var f=mes.fixas.filter(function(x){return x.id===t.dataset.toggle;})[0];
       if(f){ f.pago=!f.pago; await salvar(); render(); } return;
+    }
+    if(t.dataset.toggleGrupo){
+      var tg=t.dataset.toggleGrupo;
+      gruposInvestFechados[tg]=!gruposInvestFechados[tg];
+      render(); return;
     }
     if(t.dataset.del==='job'){
       jobs=jobs.filter(function(x){return x.id!==t.dataset.id;});
