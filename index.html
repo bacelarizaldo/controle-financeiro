@@ -406,7 +406,7 @@
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
-  var investimentos=[], mercado={cdi:[],selic:[],acoes:{},atualizadoEm:null}, tipoNovoInvest='cdi', atualizandoMercado=false;
+  var investimentos=[], mercado={cdi:[],selic:[],acoes:{},atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
   var KEY_INVEST='fin:investimentos', KEY_MERCADO='fin:mercado_cache';
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
@@ -852,21 +852,57 @@
   var ROT_TIPO_INVEST={selic:'Tesouro Selic',cdb:'CDB',cdi:'CDI',acao:'Ações'};
   var CHIP_TIPO_INVEST={selic:'inv-selic',cdb:'inv-cdb',cdi:'inv-cdi',acao:'inv-acao'};
   function ehRendaFixaInv(i){ return i.tipo==='selic'||i.tipo==='cdb'||i.tipo==='cdi'; }
+  function ehPrefixado(inv){ return inv.tipo==='cdb'&&inv.rentabilidade==='pre'; }
   function serieDoInvest(inv){ return inv.tipo==='selic' ? mercado.selic : mercado.cdi; }
+  function mesesDesde(mesIni,mesFim){ var out=[],cur=mesIni; while(cur<=mesFim){ out.push(cur); cur=proxId(cur); } return out; }
+  function diasParaVencimento(venc){
+    if(!venc) return null;
+    var hoje=new Date(); hoje.setHours(0,0,0,0);
+    var v=new Date(venc+'T00:00:00');
+    return Math.round((v-hoje)/86400000);
+  }
 
-  // valor atual de um investimento de renda fixa, aplicando mês a mês a
-  // taxa acumulada (CDI ou Selic) vezes o percentual contratado, desde o
-  // mês de aplicação até o último mês em cache
-  function valorAtualRendaFixa(inv){
+  // histórico mês a mês de um prefixado — não depende de dado de mercado
+  // nenhum, é só compor a taxa anual contratada mês a mês
+  function historicoPrefixado(inv){
+    var mesIni=(inv.data||'').slice(0,7), mesFim=hojeId();
+    var taxaMes=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/12)-1;
+    var valor=+inv.valorAplicado||0, out=[];
+    mesesDesde(mesIni,mesFim).forEach(function(m){
+      var rend=valor*taxaMes;
+      valor+=rend;
+      out.push({mes:m, rendimento:rend, acumulado:valor});
+    });
+    return out;
+  }
+  // histórico mês a mês de um pós-fixado, aplicando a taxa acumulada
+  // (CDI ou Selic) do Banco Central vezes o percentual contratado
+  function historicoPosFixado(inv){
     var serie=serieDoInvest(inv);
-    if(!serie||!serie.length) return null;
-    var mesIni=(inv.data||'').slice(0,7), valor=+inv.valorAplicado||0, achou=false;
+    if(!serie||!serie.length) return [];
+    var mesIni=(inv.data||'').slice(0,7), valor=+inv.valorAplicado||0, out=[];
     serie.forEach(function(p){
       if(p.mes<mesIni) return;
-      achou=true;
-      valor*=1+(p.taxa/100)*((+inv.percIndexador||100)/100);
+      var rend=valor*(p.taxa/100)*((+inv.percIndexador||100)/100);
+      valor+=rend;
+      out.push({mes:p.mes, rendimento:rend, acumulado:valor});
     });
-    return achou?valor:+inv.valorAplicado||0;
+    return out;
+  }
+  function historicoInvest(inv){ return ehPrefixado(inv)?historicoPrefixado(inv):historicoPosFixado(inv); }
+
+  // valor atual de um investimento de renda fixa — prefixado usa a taxa
+  // contratada (sempre disponível); pós-fixado depende da série do BCB
+  // já ter sido buscada em "Atualizar cotações"
+  function valorAtualRendaFixa(inv){
+    if(ehPrefixado(inv)){
+      var histP=historicoPrefixado(inv);
+      return histP.length?histP[histP.length-1].acumulado:(+inv.valorAplicado||0);
+    }
+    var serie=serieDoInvest(inv);
+    if(!serie||!serie.length) return null;
+    var hist=historicoPosFixado(inv);
+    return hist.length?hist[hist.length-1].acumulado:(+inv.valorAplicado||0);
   }
   function valorAtualAcao(inv){
     var cot=mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()];
@@ -881,52 +917,46 @@
     return {valor:atual-base, pct:base?(atual/base-1)*100:0};
   }
 
-  // histórico mês a mês de rendimento (só renda fixa — ações não têm
-  // preço mensal guardado, só a cotação mais recente)
-  function historicoRendaFixa(inv){
-    var serie=serieDoInvest(inv);
-    if(!serie||!serie.length) return [];
-    var mesIni=(inv.data||'').slice(0,7), valor=+inv.valorAplicado||0, out=[];
-    serie.forEach(function(p){
-      if(p.mes<mesIni) return;
-      var rend=valor*(p.taxa/100)*((+inv.percIndexador||100)/100);
-      valor+=rend;
-      out.push({mes:p.mes, rendimento:rend, acumulado:valor});
-    });
-    return out;
-  }
   function rendimentoMensalTotal(){
     var mapa={};
     investimentos.filter(ehRendaFixaInv).forEach(function(inv){
-      historicoRendaFixa(inv).forEach(function(h){ mapa[h.mes]=(mapa[h.mes]||0)+h.rendimento; });
+      historicoInvest(inv).forEach(function(h){ mapa[h.mes]=(mapa[h.mes]||0)+h.rendimento; });
     });
     return Object.keys(mapa).sort().map(function(m){ return {mes:m, rendimento:mapa[m]}; });
   }
   function nomeMesAno(mesId2){ var p=mesId2.split('-'); return MESES[+p[1]-1]+'/'+p[0].slice(2); }
 
   // taxa média mensal (%) da série, últimos N meses em cache — usada só
-  // pra projeção simples
+  // pra projeção simples dos pós-fixados
   function taxaMediaMensal(serie,n){
     if(!serie||!serie.length) return null;
     var ult=serie.slice(-n);
     if(!ult.length) return null;
     return ult.reduce(function(a,p){return a+p.taxa;},0)/ult.length;
   }
+  function projecaoInvestRendaFixa(inv,mesesAFrente){
+    var atual=valorAtualRendaFixa(inv); if(atual==null) atual=baseInvest(inv);
+    if(ehPrefixado(inv)){
+      var taxaMes=Math.pow(1+(+inv.taxaPrefixada||0)/100,1/12)-1;
+      return atual*Math.pow(1+taxaMes,mesesAFrente);
+    }
+    var tCdi=taxaMediaMensal(mercado.cdi,6), tSelic=taxaMediaMensal(mercado.selic,6);
+    var taxa=(tCdi!=null&&tSelic!=null)?(tCdi+tSelic)/2:(tCdi!=null?tCdi:tSelic);
+    if(taxa==null) return atual;
+    var fator=(+inv.percIndexador||100)/100;
+    return atual*Math.pow(1+(taxa/100)*fator,mesesAFrente);
+  }
   function projecaoRendaFixa(mesesAFrente){
     var lista=investimentos.filter(ehRendaFixaInv);
     if(!lista.length) return null;
-    var totalAtual=lista.reduce(function(a,inv){return a+(valorAtualRendaFixa(inv)||baseInvest(inv));},0);
-    var tCdi=taxaMediaMensal(mercado.cdi,6), tSelic=taxaMediaMensal(mercado.selic,6);
-    var taxa=(tCdi!=null&&tSelic!=null)?(tCdi+tSelic)/2:(tCdi!=null?tCdi:tSelic);
-    if(taxa==null) return null;
-    return totalAtual*Math.pow(1+taxa/100,mesesAFrente);
+    return lista.reduce(function(a,inv){return a+projecaoInvestRendaFixa(inv,mesesAFrente);},0);
   }
 
   async function atualizarMercado(){
     if(atualizandoMercado) return;
     atualizandoMercado=true;
     try{
-      var rf=investimentos.filter(ehRendaFixaInv);
+      var rf=investimentos.filter(function(i){return ehRendaFixaInv(i)&&!ehPrefixado(i);});
       var minData=rf.reduce(function(m,i){return (!m||i.data<m)?i.data:m;},null);
       var acoes=investimentos.filter(function(i){return i.tipo==='acao'&&i.ticker;});
       var tickers=Array.from(new Set(acoes.map(function(i){return i.ticker.toUpperCase();})));
@@ -983,12 +1013,27 @@
       h+='<div class="field"><label for="nvi-ticker">Ticker</label><input id="nvi-ticker" style="width:90px;text-transform:uppercase" placeholder="PETR4"></div>';
       h+='<div class="field"><label for="nvi-qtd">Quantidade</label><input id="nvi-qtd" style="width:90px;text-align:right" placeholder="100"></div>';
       h+='<div class="field"><label for="nvi-pm">Preço médio</label><input id="nvi-pm" class="w-val" placeholder="R$ 0,00"></div>';
+      h+='<div class="field"><label for="nvi-corretora">Corretora</label><input id="nvi-corretora" style="width:140px" placeholder="Ex.: XP, Clear…"></div>';
     }else{
       h+='<div class="field"><label for="nvi-nome">Nome</label><input id="nvi-nome" style="width:170px" placeholder="Ex.: CDB Banco X"></div>';
       h+='<div class="field"><label for="nvi-val">Valor aplicado</label><input id="nvi-val" class="w-val" placeholder="R$ 0,00"></div>';
-      h+='<div class="field"><label for="nvi-perc">% do '+(tipoNovoInvest==='selic'?'Selic':'CDI')+'</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
+      if(tipoNovoInvest==='cdb'){
+        h+='<div class="field"><label for="nvi-rent">Rentabilidade</label><select id="nvi-rent">'+
+          '<option value="pos"'+(rentNovoInvest==='pos'?' selected':'')+'>Pós-fixado (% do CDI)</option>'+
+          '<option value="pre"'+(rentNovoInvest==='pre'?' selected':'')+'>Prefixado (taxa ao ano)</option>'+
+          '</select></div>';
+      }
+      if(tipoNovoInvest==='cdb'&&rentNovoInvest==='pre'){
+        h+='<div class="field"><label for="nvi-taxa">Taxa (% a.a.)</label><input id="nvi-taxa" style="width:80px;text-align:center" placeholder="Ex.: 14,5"></div>';
+      }else{
+        h+='<div class="field"><label for="nvi-perc">% do '+(tipoNovoInvest==='selic'?'Selic':'CDI')+'</label><input id="nvi-perc" style="width:70px;text-align:center" placeholder="100" value="100"></div>';
+      }
+      h+='<div class="field"><label for="nvi-instituicao">Instituição</label><input id="nvi-instituicao" style="width:150px" placeholder="Ex.: Banco X, XP…"></div>';
+      h+='<div class="field"><label for="nvi-venc">Vencimento</label><input id="nvi-venc" type="date"></div>';
+      h+='<div class="field"><label for="nvi-liquidez">Liquidez</label><select id="nvi-liquidez"><option value="diaria">Diária</option><option value="vencimento">No vencimento</option></select></div>';
     }
     h+='<div class="field"><label for="nvi-data">Data</label><input id="nvi-data" type="date" value="'+esc(dataPadrao())+'"></div>';
+    h+='<div class="field" style="flex:1 1 220px"><label for="nvi-obs">Observações</label><input id="nvi-obs" style="width:100%" placeholder="Opcional"></div>';
     h+='<button class="addbtn" data-act="add-invest">Adicionar</button></div>';
 
     if(!investimentos.length){
@@ -1002,15 +1047,22 @@
         h+='<div class="fin-linha"><span><span class="chip '+CHIP_TIPO_INVEST[inv.tipo]+'">'+ROT_TIPO_INVEST[inv.tipo]+'</span></span><span>Aplicado em '+esc(dataCurta(inv.data))+'</span></div>';
         if(inv.tipo==='acao'){
           h+='<div class="fin-linha"><span>'+(+inv.quantidade||0)+' cotas · preço médio '+money(inv.precoMedio)+'</span><span>'+(mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()]?'Cotação atual: '+money(mercado.acoes[(inv.ticker||'').toUpperCase()].preco):'Cotação ainda não atualizada')+'</span></div>';
+          if(inv.corretora) h+='<div class="fin-linha"><span>Corretora</span><span>'+esc(inv.corretora)+'</span></div>';
         }else{
-          h+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(+inv.percIndexador||100)+'% do '+(inv.tipo==='selic'?'Selic':'CDI')+'</span></div>';
+          h+='<div class="fin-linha"><span>Valor aplicado: '+money(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):((+inv.percIndexador||100)+'% do '+(inv.tipo==='selic'?'Selic':'CDI')))+'</span></div>';
+          if(inv.instituicao||inv.liquidez) h+='<div class="fin-linha"><span>'+(inv.instituicao?esc(inv.instituicao):'—')+'</span><span>Liquidez: '+(inv.liquidez==='vencimento'?'no vencimento':'diária')+'</span></div>';
+          if(inv.vencimento){
+            var dv=diasParaVencimento(inv.vencimento);
+            h+='<div class="fin-linha"><span>Vencimento</span><span>'+esc(dataCurta(inv.vencimento))+(dv==null?'':(dv<0?' (vencido)':' (em '+dv+' dias)'))+'</span></div>';
+          }
         }
+        if(inv.obs) h+='<div class="fin-linha" style="padding-top:2px"><span style="color:var(--muted);font-style:italic">'+esc(inv.obs)+'</span></div>';
         h+='<div class="fin-linha"><span>Rendimento</span><span>'+(rend.valor!=null?'<span class="chip '+(rend.valor>=0?'ganho':'perda')+'">'+(rend.valor>=0?'+':'')+money(rend.valor)+' ('+(rend.pct>=0?'+':'')+rend.pct.toFixed(2)+'%)</span>':'Clique em “Atualizar cotações”')+'</span></div>';
         h+='<div class="adder" style="border-top:1px solid var(--rule-soft);margin-top:10px;padding-top:12px">';
         h+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
         h+='</div></div></div>';
       });
-      h+='<div class="sec-note">Selic, CDB e CDI são calculados mês a mês pela taxa oficial do Banco Central vezes o percentual contratado. Ações usam a cotação mais recente — clique em “Atualizar cotações” pra trazer os números do mercado.</div>';
+      h+='<div class="sec-note">Prefixados usam a taxa contratada direto, sem depender de cotação. Selic/CDI e CDB pós-fixado são calculados mês a mês pela taxa oficial do Banco Central vezes o percentual contratado — clique em “Atualizar cotações” pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
     }
     h+='</section>';
 
@@ -1025,7 +1077,7 @@
           h+='<tr><td class="dim val">'+esc(nomeMesAno(x.mes))+'</td><td class="r val" style="color:var(--green)">+'+money(x.rendimento)+'</td></tr>';
         });
         h+='</tbody></table>';
-        h+='<div class="sec-note">Soma do rendimento de todos os ativos de Selic/CDB/CDI naquele mês, com base na taxa oficial já divulgada.</div>';
+        h+='<div class="sec-note">Soma do rendimento de todos os ativos de Selic/CDB/CDI naquele mês.</div>';
       }
       h+='</section>';
 
@@ -1037,7 +1089,7 @@
         h+='<div class="hero-cell" style="color:var(--ink)"><span style="color:var(--muted)">Em 6 meses</span><b>'+money(p6)+'</b></div>';
         h+='<div class="hero-cell" style="color:var(--ink)"><span style="color:var(--muted)">Em 12 meses</span><b>'+money(p12)+'</b></div>';
         h+='</div>';
-        h+='<div class="sec-note">Projeção simples: aplica a taxa média dos últimos 6 meses (Selic/CDI) sobre o valor atual da renda fixa. É só uma extrapolação matemática do histórico, não uma previsão nem recomendação — a taxa real pode mudar.</div>';
+        h+='<div class="sec-note">Prefixados usam a taxa contratada; pós-fixados usam a taxa média dos últimos 6 meses. É só uma extrapolação matemática, não uma previsão nem recomendação — a taxa real pode mudar.</div>';
         h+='</section>';
       }
     }
@@ -1590,19 +1642,30 @@
     if(act==='add-invest'){
       var tpi=document.getElementById('nvi-tipo').value;
       var dti=document.getElementById('nvi-data').value||dataPadrao();
-      var novoInv={id:uid(),tipo:tpi,data:dti};
+      var obsi=document.getElementById('nvi-obs').value.trim();
+      var novoInv={id:uid(),tipo:tpi,data:dti,obs:obsi};
       if(tpi==='acao'){
         var tk=document.getElementById('nvi-ticker').value.trim().toUpperCase();
         var qt=parseNum(document.getElementById('nvi-qtd').value);
         var pm=parseNum(document.getElementById('nvi-pm').value);
+        var corr=document.getElementById('nvi-corretora').value.trim();
         if(!tk||!qt||!pm){ toast('Preencha o ticker, a quantidade e o preço médio.'); return; }
-        novoInv.ticker=tk; novoInv.quantidade=qt; novoInv.precoMedio=pm;
+        novoInv.ticker=tk; novoInv.quantidade=qt; novoInv.precoMedio=pm; novoInv.corretora=corr;
       }else{
         var nvn=document.getElementById('nvi-nome').value.trim();
         var vvi=parseNum(document.getElementById('nvi-val').value);
-        var pci=parseNum(document.getElementById('nvi-perc').value)||100;
         if(!nvn||!vvi){ toast('Preencha o nome e o valor aplicado.'); return; }
-        novoInv.nome=nvn; novoInv.valorAplicado=vvi; novoInv.percIndexador=pci;
+        novoInv.nome=nvn; novoInv.valorAplicado=vvi;
+        novoInv.instituicao=document.getElementById('nvi-instituicao').value.trim();
+        novoInv.vencimento=document.getElementById('nvi-venc').value||'';
+        novoInv.liquidez=document.getElementById('nvi-liquidez').value;
+        if(tpi==='cdb'&&document.getElementById('nvi-rent').value==='pre'){
+          var txp=parseNum(document.getElementById('nvi-taxa').value);
+          if(!txp){ toast('Preencha a taxa prefixada ao ano.'); return; }
+          novoInv.rentabilidade='pre'; novoInv.taxaPrefixada=txp;
+        }else{
+          novoInv.rentabilidade='pos'; novoInv.percIndexador=parseNum(document.getElementById('nvi-perc').value)||100;
+        }
       }
       investimentos.push(novoInv);
       await sset(KEY_INVEST,investimentos); render();
@@ -1636,7 +1699,8 @@
       render(); return;
     }
     if(el.id==='imp-conta'){ imp.conta=el.value; return; }
-    if(el.id==='nvi-tipo'){ tipoNovoInvest=el.value; render(); return; }
+    if(el.id==='nvi-tipo'){ tipoNovoInvest=el.value; rentNovoInvest='pos'; render(); return; }
+    if(el.id==='nvi-rent'){ rentNovoInvest=el.value; render(); return; }
 
     if(el.dataset.jedit){
       var jx=jobs.filter(function(x){return x.id===el.dataset.id;})[0];
