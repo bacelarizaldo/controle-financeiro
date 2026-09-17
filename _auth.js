@@ -8,7 +8,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 const COOKIE = 'fin_session';
-const DIAS = 60;
+const DIAS_LEMBRAR = 60;   // sessão longa, só quando a pessoa marca "lembrar de mim"
+const HORAS_PADRAO = 12;   // sessão curta (padrão): expira sozinha, mesmo sem fechar o app
 
 // Hash "vazio" só pra gastar o mesmo tempo de CPU quando o usuário nem
 // existe — evita que alguém descubra quais usuários são válidos medindo
@@ -104,10 +105,18 @@ function exigirAuth(req, res) {
   return true;
 }
 
-function cookieLogin(usuario) {
-  const exp = Date.now() + DIAS * 24 * 60 * 60 * 1000;
-  const maxAge = DIAS * 24 * 60 * 60;
-  return COOKIE + '=' + assinar(exp, usuario) + '; HttpOnly; Secure; SameSite=Lax; Max-Age=' + maxAge + '; Path=/';
+// lembrar=true: cookie persistente de 60 dias (Max-Age), como antes.
+// lembrar=false (padrão): cookie de SESSÃO — sem Max-Age, então o
+// navegador o apaga ao fechar de verdade — e o token em si expira em
+// 12h mesmo que o navegador/PWA mantenha o cookie vivo além disso. É
+// esse o "ciclo de login" pedido: sem marcar lembrar, a sessão não dura
+// pra sempre só por manter o app aberto/instalado.
+function cookieLogin(usuario, lembrar) {
+  const ms = lembrar ? DIAS_LEMBRAR * 24 * 60 * 60 * 1000 : HORAS_PADRAO * 60 * 60 * 1000;
+  const exp = Date.now() + ms;
+  let cookie = COOKIE + '=' + assinar(exp, usuario) + '; HttpOnly; Secure; SameSite=Lax; Path=/';
+  if (lembrar) cookie += '; Max-Age=' + Math.floor(ms / 1000);
+  return cookie;
 }
 
 function cookieLogout() {

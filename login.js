@@ -8,6 +8,7 @@ module.exports = async function handler(req, res) {
   }
   const usuario = (req.body && req.body.usuario) || '';
   const senha = (req.body && req.body.senha) || '';
+  const lembrar = !!(req.body && req.body.lembrar);
   if (!usuario || !senha) {
     res.status(400).json({ error: 'Preencha usuário e senha.' });
     return;
