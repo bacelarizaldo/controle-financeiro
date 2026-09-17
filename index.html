@@ -1005,6 +1005,68 @@
     return {valor:atual-base, pct:base?(atual/base-1)*100:0};
   }
 
+  // tabela regressiva de IR sobre renda fixa (sobre o RENDIMENTO, não o
+  // total): até 180 dias 22,5% · 181–360 dias 20% · 361–720 dias 17,5%
+  // · acima de 720 dias 15%. Não inclui IOF (só pesa em resgates com
+  // menos de 30 dias) nem a regra de isenção de ações (depende do total
+  // vendido no mês, que este app não acompanha) — por isso ações entram
+  // aqui pelo valor bruto mesmo.
+  function aliquotaIR(dias){
+    if(dias<=180) return 0.225;
+    if(dias<=360) return 0.20;
+    if(dias<=720) return 0.175;
+    return 0.15;
+  }
+  function valorLiquidoInvest(inv){
+    var atual=valorAtualInvest(inv);
+    if(atual==null) atual=baseInvest(inv);
+    if(inv.tipo==='acao') return atual;
+    var base=baseInvest(inv), rend=atual-base;
+    if(rend<=0) return atual;
+    var dias=diasEntre(inv.data,hojeISO());
+    return atual-rend*aliquotaIR(dias);
+  }
+
+  // grupos pra organizar a carteira — Selic e Prefixado são os dois a
+  // mesma "família" (Tesouro Direto), CDB e CDI são renda fixa privada
+  var GRUPOS_INVEST=[
+    {id:'tesouro', nome:'Tesouro Direto', tipos:['selic','txpre'], cor:'var(--azul)', corEsc:'var(--azul-esc)', corSuave:'#E7EFF9'},
+    {id:'privada', nome:'Renda Fixa Privada', tipos:['cdb','cdi'], cor:'var(--violeta)', corEsc:'var(--violeta-esc)', corSuave:'#F1E9F8'},
+    {id:'acoes', nome:'Ações', tipos:['acao'], cor:'var(--rose)', corEsc:'var(--rose-esc)', corSuave:'#F7E8EE'}
+  ];
+  function grupoDoInvest(inv){
+    return GRUPOS_INVEST.filter(function(g){return g.tipos.indexOf(inv.tipo)>-1;})[0]||GRUPOS_INVEST[1];
+  }
+
+  // desenha um donut SVG a partir de fatias [{valor,cor,rotulo}] — sem
+  // biblioteca externa, só path de arco; o <title> dá tooltip nativo ao
+  // passar o mouse/dedo, então já é "dinâmico" sem precisar de JS extra
+  function graficoPizza(fatias,tamanho){
+    tamanho=tamanho||168;
+    var total=fatias.reduce(function(a,f){return a+f.valor;},0);
+    if(!total) return '';
+    var raio=tamanho/2, cx=raio, cy=raio, raioInt=raio*0.62;
+    var ang=-90;
+    var svg='<svg viewBox="0 0 '+tamanho+' '+tamanho+'" width="'+tamanho+'" height="'+tamanho+'" style="display:block">';
+    fatias.forEach(function(f){
+      if(f.valor<=0) return;
+      var fracao=f.valor/total;
+      var angFim=ang+fracao*360;
+      var largeArc=(angFim-ang)>180?1:0;
+      var r=Math.PI/180;
+      var x1=cx+raio*Math.cos(ang*r), y1=cy+raio*Math.sin(ang*r);
+      var x2=cx+raio*Math.cos(angFim*r), y2=cy+raio*Math.sin(angFim*r);
+      var xi1=cx+raioInt*Math.cos(angFim*r), yi1=cy+raioInt*Math.sin(angFim*r);
+      var xi2=cx+raioInt*Math.cos(ang*r), yi2=cy+raioInt*Math.sin(ang*r);
+      var d='M'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+raio+','+raio+' 0 '+largeArc+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)+
+            ' L'+xi1.toFixed(2)+','+yi1.toFixed(2)+' A'+raioInt+','+raioInt+' 0 '+largeArc+' 0 '+xi2.toFixed(2)+','+yi2.toFixed(2)+' Z';
+      svg+='<path d="'+d+'" fill="'+f.cor+'"><title>'+esc(f.rotulo)+': '+money(f.valor)+' ('+(fracao*100).toFixed(1)+'%)</title></path>';
+      ang=angFim;
+    });
+    svg+='</svg>';
+    return svg;
+  }
+
   function rendimentoMensalTotal(){
     var mapa={};
     investimentos.filter(ehRendaFixaInv).forEach(function(inv){
@@ -1103,10 +1165,31 @@
     h+='<div class="hero-num">'+moneyExib(totalAtual)+'</div>';
     h+='<div class="hero-sub">'+(investimentos.length?('Aplicado: '+moneyExib(totalAplicado)+' · Rendimento: '+(totalRend>=0?'+':'')+moneyExib(totalRend)+' ('+(pctRend>=0?'+':'')+pctRend.toFixed(2)+'%)'):'Cadastre seus investimentos (Selic, CDB, CDI, ações) pra acompanhar o rendimento aqui.')+'</div>';
     if(investimentos.length){
+      var totalLiquido=investimentos.reduce(function(a,i){return a+valorLiquidoInvest(i);},0);
       h+='<div class="hero-grid"><div class="hero-cell"><span>Ativos cadastrados</span><b>'+investimentos.length+'</b></div>';
+      h+='<div class="hero-cell"><span>Valor líquido estimado</span><b>'+moneyExib(totalLiquido)+'</b></div>';
       h+='<div class="hero-cell"><span>Cotações atualizadas</span><b>'+(mercado.atualizadoEm?dataCurta(mercado.atualizadoEm.slice(0,10))+' '+new Date(mercado.atualizadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'ainda não')+'</b></div></div>';
     }
     h+='</div>';
+
+    if(investimentos.length){
+      var fatiasGrupo=GRUPOS_INVEST.map(function(g){
+        var lista=investimentos.filter(function(i){return grupoDoInvest(i).id===g.id;});
+        var val=lista.reduce(function(a,i){return a+(valorAtualInvest(i)!=null?valorAtualInvest(i):baseInvest(i));},0);
+        return {valor:val,cor:g.cor,corEsc:g.corEsc,rotulo:g.nome};
+      }).filter(function(f){return f.valor>0;});
+      if(fatiasGrupo.length){
+        h+='<section><div class="sec-head"><h2>Composição da carteira</h2></div>';
+        h+='<div style="display:flex;align-items:center;gap:26px;flex-wrap:wrap">';
+        h+=graficoPizza(fatiasGrupo,168);
+        h+='<div style="display:flex;flex-direction:column;gap:9px;flex:1 1 190px">';
+        fatiasGrupo.forEach(function(f){
+          var pct=totalAtual?(f.valor/totalAtual*100):0;
+          h+='<div style="display:flex;align-items:center;gap:8px;font-size:13.5px"><span style="width:10px;height:10px;border-radius:50%;background:'+f.cor+';flex:0 0 auto"></span><span style="flex:1">'+esc(f.rotulo)+'</span><span class="val" style="color:'+f.corEsc+';font-weight:600">'+moneyExib(f.valor)+'</span><span class="dim" style="width:44px;text-align:right">'+pct.toFixed(0)+'%</span></div>';
+        });
+        h+='</div></div></section>';
+      }
+    }
 
     h+='<section><div class="sec-head"><h2>Carteira</h2><span class="sec-total">'+moneyExib(totalAtual)+'</span></div>';
 
@@ -1149,43 +1232,72 @@
     if(!investimentos.length){
       h+='<div class="vazio">Nenhum investimento cadastrado ainda.</div>';
     }else{
-      investimentos.slice().sort(function(a,b){return (a.data||'').localeCompare(b.data||'');}).forEach(function(inv){
-        var rend=rendimentoInvest(inv), atual=valorAtualInvest(inv);
-        var nomeExib=inv.tipo==='acao'?(inv.ticker||'').toUpperCase():inv.nome;
-        var keyI='invest:'+inv.id;
-        var abertoI=!!cardsAbertos[keyI];
-        h+='<div class="conta-bloco"><button type="button" class="conta-top c-verde" data-toggle-card="'+keyI+'" aria-expanded="'+abertoI+'"><b>'+esc(nomeExib)+'</b><span style="display:flex;align-items:center;gap:10px"><span class="val">'+(atual!=null?moneyExib(atual):moneyExib(baseInvest(inv)))+'</span><span class="chev'+(abertoI?' aberto':'')+'">›</span></span></button>';
-        if(abertoI){
-        h+='<div class="conta-body" style="padding:12px 14px 14px">';
-        h+='<div class="fin-linha"><span><span class="chip '+CHIP_TIPO_INVEST[inv.tipo]+'">'+ROT_TIPO_INVEST[inv.tipo]+'</span></span><span>Aplicado em '+esc(dataCurta(inv.data))+'</span></div>';
-        if(inv.tipo==='acao'){
-          h+='<div class="fin-linha"><span>'+(+inv.quantidade||0)+' cotas · preço médio '+moneyExib(inv.precoMedio)+'</span><span>'+(mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()]?'Cotação atual: '+moneyExib(mercado.acoes[(inv.ticker||'').toUpperCase()].preco):'Cotação ainda não atualizada')+'</span></div>';
-          if(inv.corretora) h+='<div class="fin-linha"><span>Corretora</span><span>'+esc(inv.corretora)+'</span></div>';
-        }else{
-          h+='<div class="fin-linha"><span>Valor aplicado: '+moneyExib(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):(inv.tipo==='selic'?('Selic + '+(+inv.spreadSelic||0).toFixed(3)+'% a.a.'):((+inv.percIndexador||100)+'% do CDI')))+'</span></div>';
-          if(inv.instituicao||inv.liquidez) h+='<div class="fin-linha"><span>'+(inv.instituicao?esc(inv.instituicao):'—')+'</span><span>Liquidez: '+(inv.liquidez==='vencimento'?'no vencimento':'diária')+'</span></div>';
-          if(inv.vencimento){
-            var dv=diasParaVencimento(inv.vencimento);
-            h+='<div class="fin-linha"><span>Vencimento</span><span>'+esc(dataCurta(inv.vencimento))+(dv==null?'':(dv<0?' (vencido)':' (em '+dv+' dias)'))+'</span></div>';
+      GRUPOS_INVEST.forEach(function(g){
+        var listaGrupo=investimentos.filter(function(i){return grupoDoInvest(i).id===g.id;}).sort(function(a,b){return (a.data||'').localeCompare(b.data||'');});
+        if(!listaGrupo.length) return;
+        var totalGrupo=listaGrupo.reduce(function(a,i){return a+(valorAtualInvest(i)!=null?valorAtualInvest(i):baseInvest(i));},0);
+        var keyG='grupo:'+g.id;
+        var abertoG=!!cardsAbertos[keyG];
+        h+='<div class="conta-bloco" style="margin-top:16px"><button type="button" class="conta-top" style="background:'+g.corSuave+';border-left-color:'+g.cor+'" data-toggle-card="'+keyG+'" aria-expanded="'+abertoG+'"><b style="color:'+g.corEsc+'">'+esc(g.nome)+' <span class="dim" style="font-weight:400">('+listaGrupo.length+')</span></b><span style="display:flex;align-items:center;gap:10px"><span class="val" style="color:'+g.corEsc+'">'+moneyExib(totalGrupo)+'</span><span class="chev'+(abertoG?' aberto':'')+'">›</span></span></button>';
+        if(abertoG){
+          h+='<div class="conta-body" style="padding:14px 14px 10px">';
+          if(listaGrupo.length>1){
+            var paletaAux=[g.cor,g.corEsc,'#8C6712','#5C8F3F','#B0507A','#35528F'];
+            var fatiasAtivo=listaGrupo.map(function(inv,idx){
+              var val=valorAtualInvest(inv)!=null?valorAtualInvest(inv):baseInvest(inv);
+              var nome=inv.tipo==='acao'?(inv.ticker||'').toUpperCase():inv.nome;
+              return {valor:val,cor:paletaAux[idx%paletaAux.length],rotulo:nome};
+            });
+            h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px">';
+            h+=graficoPizza(fatiasAtivo,104);
+            h+='<div style="display:flex;flex-direction:column;gap:5px;flex:1 1 140px">';
+            fatiasAtivo.forEach(function(f){
+              h+='<div style="display:flex;align-items:center;gap:7px;font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:'+f.cor+';flex:0 0 auto"></span><span class="dim" style="flex:1">'+esc(f.rotulo)+'</span></div>';
+            });
+            h+='</div></div>';
           }
-          if(inv.tipo==='selic'||inv.tipo==='txpre'){
-            if(inv.quantidadeTitulos){
-              var t=tituloDoInvest(inv);
-              h+='<div class="fin-linha"><span>'+(+inv.quantidadeTitulos)+' título(s)</span><span>'+(t?('PU de resgate hoje: '+moneyExib(t.precoResgate)):'Título não encontrado na lista de hoje — usando estimativa por taxa')+'</span></div>';
+          listaGrupo.forEach(function(inv){
+            var rend=rendimentoInvest(inv), atual=valorAtualInvest(inv);
+            var nomeExib=inv.tipo==='acao'?(inv.ticker||'').toUpperCase():inv.nome;
+            var keyI='invest:'+inv.id;
+            var abertoI=!!cardsAbertos[keyI];
+            h+='<div class="conta-bloco"><button type="button" class="conta-top c-verde" data-toggle-card="'+keyI+'" aria-expanded="'+abertoI+'"><b>'+esc(nomeExib)+'</b><span style="display:flex;align-items:center;gap:10px"><span class="val">'+(atual!=null?moneyExib(atual):moneyExib(baseInvest(inv)))+'</span><span class="chev'+(abertoI?' aberto':'')+'">›</span></span></button>';
+            if(abertoI){
+            h+='<div class="conta-body" style="padding:12px 14px 14px">';
+            h+='<div class="fin-linha"><span><span class="chip '+CHIP_TIPO_INVEST[inv.tipo]+'">'+ROT_TIPO_INVEST[inv.tipo]+'</span></span><span>Aplicado em '+esc(dataCurta(inv.data))+'</span></div>';
+            if(inv.tipo==='acao'){
+              h+='<div class="fin-linha"><span>'+(+inv.quantidade||0)+' cotas · preço médio '+moneyExib(inv.precoMedio)+'</span><span>'+(mercado.acoes&&mercado.acoes[(inv.ticker||'').toUpperCase()]?'Cotação atual: '+moneyExib(mercado.acoes[(inv.ticker||'').toUpperCase()].preco):'Cotação ainda não atualizada')+'</span></div>';
+              if(inv.corretora) h+='<div class="fin-linha"><span>Corretora</span><span>'+esc(inv.corretora)+'</span></div>';
             }else{
-              h+='<div class="fin-linha"><span style="color:var(--muted);font-size:12px">Sem quantidade de títulos cadastrada — usando estimativa por taxa, não o preço real de mercado</span></div>';
+              h+='<div class="fin-linha"><span>Valor aplicado: '+moneyExib(inv.valorAplicado)+'</span><span>'+(ehPrefixado(inv)?('Prefixado: '+(+inv.taxaPrefixada||0).toFixed(2)+'% a.a.'):(inv.tipo==='selic'?('Selic + '+(+inv.spreadSelic||0).toFixed(3)+'% a.a.'):((+inv.percIndexador||100)+'% do CDI')))+'</span></div>';
+              if(inv.instituicao||inv.liquidez) h+='<div class="fin-linha"><span>'+(inv.instituicao?esc(inv.instituicao):'—')+'</span><span>Liquidez: '+(inv.liquidez==='vencimento'?'no vencimento':'diária')+'</span></div>';
+              if(inv.vencimento){
+                var dv=diasParaVencimento(inv.vencimento);
+                h+='<div class="fin-linha"><span>Vencimento</span><span>'+esc(dataCurta(inv.vencimento))+(dv==null?'':(dv<0?' (vencido)':' (em '+dv+' dias)'))+'</span></div>';
+              }
+              if(inv.tipo==='selic'||inv.tipo==='txpre'){
+                if(inv.quantidadeTitulos){
+                  var t=tituloDoInvest(inv);
+                  h+='<div class="fin-linha"><span>'+(+inv.quantidadeTitulos)+' título(s)</span><span>'+(t?('PU de resgate hoje: '+moneyExib(t.precoResgate)):'Título não encontrado na lista de hoje — usando estimativa por taxa')+'</span></div>';
+                }else{
+                  h+='<div class="fin-linha"><span style="color:var(--muted);font-size:12px">Sem quantidade de títulos cadastrada — usando estimativa por taxa, não o preço real de mercado</span></div>';
+                }
+              }
             }
-          }
-        }
-        if(inv.obs) h+='<div class="fin-linha" style="padding-top:2px"><span style="color:var(--muted);font-style:italic">'+esc(inv.obs)+'</span></div>';
-        h+='<div class="fin-linha"><span>Rendimento</span><span>'+(rend.valor!=null?'<span class="chip '+(rend.valor>=0?'ganho':'perda')+'">'+(rend.valor>=0?'+':'')+moneyExib(rend.valor)+' ('+(rend.pct>=0?'+':'')+rend.pct.toFixed(2)+'%)</span>':'Clique em “Atualizar cotações”')+'</span></div>';
-        h+='<div class="adder" style="border-top:1px solid var(--rule-soft);margin-top:10px;padding-top:12px">';
-        h+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
-        h+='</div></div>';
+            if(inv.obs) h+='<div class="fin-linha" style="padding-top:2px"><span style="color:var(--muted);font-style:italic">'+esc(inv.obs)+'</span></div>';
+            h+='<div class="fin-linha"><span>Rendimento</span><span>'+(rend.valor!=null?'<span class="chip '+(rend.valor>=0?'ganho':'perda')+'">'+(rend.valor>=0?'+':'')+moneyExib(rend.valor)+' ('+(rend.pct>=0?'+':'')+rend.pct.toFixed(2)+'%)</span>':'Clique em “Atualizar cotações”')+'</span></div>';
+            h+='<div class="fin-linha"><span>Líquido estimado (IR)</span><span class="val">'+moneyExib(valorLiquidoInvest(inv))+'</span></div>';
+            h+='<div class="adder" style="border-top:1px solid var(--rule-soft);margin-top:10px;padding-top:12px">';
+            h+='<button class="del" data-del="invest" data-id="'+inv.id+'" aria-label="Remover" style="margin-left:auto">×</button>';
+            h+='</div></div>';
+            }
+            h+='</div>';
+          });
+          h+='</div>';
         }
         h+='</div>';
       });
-      h+='<div class="sec-note">Tesouro Selic e Tesouro Prefixado: informe a "Qtd. de títulos" e o vencimento pra usar o preço real de resgate do dia (fonte: Tesouro Direto) — marcação a mercado de verdade. Sem isso, caem numa estimativa por taxa (CDB segue sempre por taxa, já que não tem preço de mercado público). Clique em "Atualizar cotações" pra trazer os números mais recentes. Ações usam a cotação mais recente.</div>';
+      h+='<div class="sec-note">Tesouro Selic e Tesouro Prefixado ficam juntos em "Tesouro Direto" (mesmo emissor); CDB e CDI ficam em "Renda Fixa Privada". Informe "Qtd. de títulos" e o vencimento nos ativos do Tesouro pra usar o preço real de resgate do dia — sem isso, caem numa estimativa por taxa. "Líquido estimado" já desconta o IR regressivo (22,5% a 15% conforme o tempo aplicado); não inclui IOF de resgates com menos de 30 dias nem a isenção de ações, que depende do total vendido no mês.</div>';
     }
     h+='</section>';
 
