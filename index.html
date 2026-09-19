@@ -439,15 +439,16 @@
   .jobs-table th:nth-child(3),.jobs-table th:nth-child(4),.jobs-table th:nth-child(5){width:128px}
   .jobs-table th:nth-child(6){width:104px}.jobs-table th:nth-child(7){width:34px}
   #app .jobs-table .inline-val{width:112px;max-width:100%;padding-left:5px;padding-right:5px}
-  .aba-valores{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--rule);box-shadow:var(--shadow-sm);color:var(--ink)}
-  .aba-valores:hover{background:#fff;color:var(--ink)}
   .sec-recolhivel{padding:0;overflow:hidden}
   .sec-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:20px 24px;border:0;background:#fff;color:var(--ink);font:inherit;text-align:left}
   .sec-toggle:hover{background:#FAFAF8}.sec-toggle h2{margin:0;font-family:var(--sans);font-size:20px;font-weight:730;letter-spacing:-.04em}
   .sec-toggle-info{display:flex;align-items:center;gap:12px}.sec-toggle .chev{font-size:20px}.sec-recolhivel-conteudo{padding:0 24px 21px}
   .pix-rapido{background:linear-gradient(135deg,#F0F5E8,#FFFFFF);border-color:#DEE8CF}.pix-rapido .sec-head{margin-bottom:8px}.pix-rapido .sec-head h2:before{content:'↗';display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#A9CE46;color:#173000;font-size:16px;vertical-align:1px}.pix-rapido .adder{background:rgba(255,255,255,.76)}
-  @media(max-width:620px){.aba-valores{position:sticky;right:0;font-size:0;padding:9px 11px}.aba-valores .eye-icon{font-size:16px}}
   @media(max-width:620px){.sec-toggle{padding:17px 16px}.sec-toggle h2{font-size:18px}.sec-recolhivel-conteudo{padding:0 16px 17px}.pix-rapido .sec-head h2{font-size:18px}}
+  .hero-olho{position:absolute;top:14px;right:14px;z-index:3;display:grid;place-items:center;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:var(--paper);transition:background .15s}
+  .hero-olho:hover,.hero-olho:focus-visible{background:rgba(255,255,255,.26);outline:none}
+  .hero-olho[aria-pressed="true"]{background:rgba(255,255,255,.28)}
+  .hero .hero-label{padding-right:48px}
 </style>
 
 <script>
@@ -499,6 +500,13 @@
   function money(n){ return BRL.format(n||0); }
   var valoresOcultos=false;
   function moneyExib(n){ return valoresOcultos ? 'R$ ••••' : money(n); }
+  function botaoOlho(){
+    var rot=valoresOcultos?'Mostrar valores':'Ocultar valores';
+    var ico=valoresOcultos
+      ?'<path d="M17.9 17.9A10.7 10.7 0 0 1 12 19C5.6 19 2 12 2 12a18.5 18.5 0 0 1 5-5.9"/><path d="M9.9 4.2A10 10 0 0 1 12 4c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/>'
+      :'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+    return '<button type="button" class="hero-olho" data-act="toggle-valores" aria-pressed="'+valoresOcultos+'" aria-label="'+rot+'" title="'+rot+'"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ico+'</svg></button>';
+  }
   function parseNum(s){
     if(typeof s==='number') return s;
     if(!s) return 0;
@@ -512,6 +520,31 @@
     if(/^[=+\-@\t\r]/.test(t)&&isNaN(Number(t))) t="'"+t;
     return '"'+t.replace(/"/g,'""')+'"';
   }
+  // campos de dinheiro: os dígitos digitados viram centavos (12 -> R$ 0,12; 123456 -> R$ 1.234,56)
+  var SEL_REAL='input.w-val,input.inline-val';
+  function mascaraReal(v){
+    var d=String(v||'').replace(/\D/g,'').slice(0,12).replace(/^0+/,'');
+    return d?money(parseInt(d,10)/100):'';
+  }
+  function aplicarTeclados(){
+    document.querySelectorAll(SEL_REAL).forEach(function(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('autocomplete','off'); });
+    ['nvi-taxa','nvi-spread','nvi-perc','nvi-qtdtit'].forEach(function(id){ var e=document.getElementById(id); if(e) e.setAttribute('inputmode','decimal'); });
+    ['nvi-qtd','nf-dia','nfi-tot','nfi-pag'].forEach(function(id){ var e=document.getElementById(id); if(e) e.setAttribute('inputmode','numeric'); });
+  }
+  document.addEventListener('input',function(ev){
+    var el=ev.target; if(!el||!el.matches||!el.matches(SEL_REAL)) return;
+    // a 1ª tecla depois de focar substitui o valor (não depende da seleção, que alguns navegadores desfazem ao clicar)
+    if(el._recemFocado){
+      el._recemFocado=false;
+      if(ev.inputType==='insertText'&&/^\d$/.test(ev.data||'')){ el.value=mascaraReal(ev.data); return; }
+    }
+    var f=mascaraReal(el.value); if(el.value!==f) el.value=f;
+  });
+  document.addEventListener('focusin',function(ev){
+    var el=ev.target; if(!el||!el.matches||!el.matches(SEL_REAL)) return;
+    el._recemFocado=true;
+    setTimeout(function(){ try{ el.select(); }catch(e){} },0);
+  });
   function uid(){ return Math.random().toString(36).slice(2,10); }
   var MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   function nomeMes(id){ var p=id.split('-'); return MESES[+p[1]-1]+' de '+p[0]; }
@@ -860,7 +893,7 @@
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
     h+='</div><div class="tools"><button class="toolbtn" data-act="export-jobs">Baixar em CSV</button></div></div>';
 
-    h+='<div class="hero hero-jobs"><div class="hero-label">Faturado em '+esc(nomeMesCurto(mesId))+'</div>';
+    h+='<div class="hero hero-jobs">'+botaoOlho()+'<div class="hero-label">Faturado em '+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num">'+moneyExib(totMes)+'</div>';
     h+='<div class="hero-sub">'+(doMes.length?(doMes.length+(doMes.length===1?' job fechado neste mês.':' jobs fechados neste mês.')):'Nenhum job lançado ainda neste mês.')+'</div>';
     h+='<div class="hero-grid">';
@@ -960,7 +993,7 @@
     var totMes=financ.reduce(function(a,f){return a+(faltamFin(f)?(+f.valor||0):0);},0);
     var h='';
     h+='<div class="topbar"><div class="mesnav"><h1 style="min-width:auto">Financiamentos</h1></div></div>';
-    h+='<div class="hero"><div class="hero-label">Ainda falta pagar</div>';
+    h+='<div class="hero">'+botaoOlho()+'<div class="hero-label">Ainda falta pagar</div>';
     h+='<div class="hero-num">'+moneyExib(totResta)+'</div>';
     h+='<div class="hero-sub">'+(financ.length?'Soma das parcelas que ainda não venceram, em todos os financiamentos ativos.':'Cadastre as parcelas do carro para acompanhar quanto falta e quando acaba.')+'</div>';
     if(financ.length){
@@ -1283,7 +1316,7 @@
     h+='<div class="topbar"><div class="mesnav"><h1 style="min-width:auto">Investimentos</h1></div>';
     h+='<div class="tools"><button class="toolbtn" data-act="atualizar-mercado"'+(atualizandoMercado?' disabled':'')+' style="display:inline-flex;align-items:center;gap:8px">'+(atualizandoMercado?'<span class="spinner sm"></span><span>Atualizando…</span>':'Atualizar cotações')+'</button></div></div>';
 
-    h+='<div class="hero hero-invest"><div class="hero-label">Valor atual da carteira</div>';
+    h+='<div class="hero hero-invest">'+botaoOlho()+'<div class="hero-label">Valor atual da carteira</div>';
     h+='<div class="hero-num">'+moneyExib(totalAtual)+'</div>';
     h+='<div class="hero-sub">'+(investimentos.length?('Aplicado: '+moneyExib(totalAplicado)+' · Rendimento: '+(totalRend>=0?'+':'')+moneyExib(totalRend)+' ('+(pctRend>=0?'+':'')+pctRend.toFixed(2)+'%)'):'Cadastre seus investimentos (Selic, CDB, CDI, ações) pra acompanhar o rendimento aqui.')+'</div>';
     if(investimentos.length){
@@ -1472,7 +1505,7 @@
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
     h+='</div></div>';
 
-    h+='<div class="hero hero-cartoes"><div class="hero-label">Nos cartões em '+esc(nomeMesCurto(mesId))+'</div>';
+    h+='<div class="hero hero-cartoes">'+botaoOlho()+'<div class="hero-label">Nos cartões em '+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num">'+moneyExib(totMes)+'</div>';
     h+='<div class="hero-sub">Já contado nas saídas do mês — este painel é só para separar o que é parcela do que é compra do mês.</div>';
     h+='<div class="hero-grid">';
@@ -1606,7 +1639,7 @@
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
     h+='</div></div>';
 
-    h+='<div class="hero hero-resumo"><div class="hero-label">Fechamento de '+esc(nomeMesCurto(mesId))+'</div>';
+    h+='<div class="hero hero-resumo">'+botaoOlho()+'<div class="hero-label">Fechamento de '+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num'+(sob<0?' neg':'')+'">'+moneyExib(sob)+'</div>';
     h+='<div class="hero-sub">Entrou menos tudo que saiu no mês — inclui contas fixas, cartões e gastos em dinheiro/Pix.</div>';
     h+='<div class="hero-grid">';
@@ -1662,7 +1695,7 @@
     h+='</div></div>';
 
     var semEntrada=!m.entradas.length&&!+m.repasse&&!jobsDoMes(mesId).length;
-    h+='<div class="hero"><div class="hero-label">'+(semEntrada?'Ainda sem entradas em ':'Sobrou em ')+esc(nomeMesCurto(mesId))+'</div>';
+    h+='<div class="hero">'+botaoOlho()+'<div class="hero-label">'+(semEntrada?'Ainda sem entradas em ':'Sobrou em ')+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num'+(s<0?' neg':'')+'">'+moneyExib(s)+'</div>';
     h+='<div class="hero-sub">'+(semEntrada
         ? 'Por enquanto isso é só o peso das contas fixas. Lance suas entradas abaixo para ver quanto sobra de verdade.'
@@ -1798,12 +1831,12 @@
     [['mes','Mês a mês'],['resumo','Resumo'],['jobs','Faturamento'],['cartoes','Cartões'],['financ','Financiamentos'],['invest','Investimentos']].forEach(function(a){
       h+='<button class="aba" data-vista="'+a[0]+'" aria-pressed="'+(vista===a[0])+'">'+a[1]+'</button>';
     });
-    h+='<button class="aba aba-valores" data-act="toggle-valores" aria-label="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'" title="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'"><span class="eye-icon">'+(valoresOcultos?'🙈':'👁')+'</span><span>'+ (valoresOcultos?'Mostrar valores':'Ocultar valores') +'</span></button>';
     h+='</nav>';
     h+= vista==='jobs' ? viewJobs() : (vista==='cartoes' ? viewCartoes() : (vista==='financ' ? viewFinanc() : (vista==='invest' ? viewInvest() : (vista==='resumo' ? viewResumo() : viewMes()))));
     h+='<div class="rodape">Seus dados ficam salvos só para você e continuam aqui quando voltar. Ainda assim, baixe o CSV de vez em quando — é o seu backup.</div></div>';
     h+=menuLateralHTML();
     document.getElementById('app').innerHTML=h;
+    aplicarTeclados();
   }
 
   var inputBackup=document.getElementById('arqBackup');
