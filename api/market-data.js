@@ -167,7 +167,7 @@ module.exports = async function handler(req, res) {
 
     if (tipo === 'cdi' || tipo === 'selic' || tipo === 'ipca') {
       const codigo = tipo === 'cdi' ? 4391 : (tipo === 'selic' ? 4390 : 433);
-      const desde = req.query.desde || null;
+      const desde = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.desde || '')) ? req.query.desde : null;
       const chave = 'sgs:' + codigo + ':' + (desde || 'full');
       const serie = await doCache(chave, 12 * 60 * 60 * 1000, function () { return buscarSerieBCB(codigo, desde); });
       res.status(200).json({ tipo: tipo, serie: serie });

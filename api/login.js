@@ -19,6 +19,7 @@ module.exports = async function handler(req, res) {
     return;
   }
   if (!ok) {
+    await new Promise((r) => setTimeout(r, 800));
     res.status(401).json({ error: 'Usuário ou senha incorretos.' });
     return;
   }

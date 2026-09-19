@@ -28,7 +28,9 @@ function verificarLogin(usuario, senha) {
   const mapa = usuarios();
   const chave = Object.keys(mapa).filter(function (u) { return u.toLowerCase() === String(usuario || '').toLowerCase(); })[0];
   if (!chave) return false;
-  return mapa[chave] === senha;
+  const a = crypto.createHash('sha256').update(String(mapa[chave])).digest();
+  const b = crypto.createHash('sha256').update(String(senha)).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 function assinar(exp, usuario) {

@@ -24,7 +24,8 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       if (typeof req.query.prefix === 'string') {
-        const { rows } = await sql`SELECT key FROM kv WHERE key LIKE ${req.query.prefix + '%'} ORDER BY key`;
+        const prefixo = req.query.prefix.replace(/[\\%_]/g, '\\$&') + '%';
+        const { rows } = await sql`SELECT key FROM kv WHERE key LIKE ${prefixo} ORDER BY key`;
         res.status(200).json({ keys: rows.map((r) => r.key) });
         return;
       }
@@ -51,6 +52,10 @@ module.exports = async function handler(req, res) {
       const valor = req.body && req.body.value;
       if (typeof valor !== 'string') {
         res.status(400).json({ error: 'value precisa ser string' });
+        return;
+      }
+      if (valor.length > 2000000) {
+        res.status(413).json({ error: 'Valor grande demais.' });
         return;
       }
       await sql`INSERT INTO kv (key, value, updated_at) VALUES (${key}, ${valor}, now())

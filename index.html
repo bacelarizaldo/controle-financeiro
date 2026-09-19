@@ -457,7 +457,8 @@
     get: async function(k){
       var resp=await fetch('/api/kv?key='+encodeURIComponent(k));
       if(resp.status===401) semAuth();
-      if(!resp.ok){ var e=new Error('not found'); throw e; }
+      if(resp.status===404){ var e=new Error('not found'); e.notFound=true; throw e; }
+      if(!resp.ok) throw new Error('Erro '+resp.status+' ao ler o servidor.');
       var data=await resp.json();
       return {key:data.key, value:data.value};
     },
@@ -472,7 +473,7 @@
     list: async function(prefix){
       var resp=await fetch('/api/kv?prefix='+encodeURIComponent(prefix||''));
       if(resp.status===401) semAuth();
-      if(!resp.ok) return {keys:[]};
+      if(!resp.ok) throw new Error('Erro '+resp.status+' ao listar no servidor.');
       var data=await resp.json();
       return {keys:data.keys||[]};
     },
@@ -495,7 +496,13 @@
     if(!s) return 0;
     s=String(s).replace(/[^\d,.-]/g,'');
     if(s.indexOf(',')>-1){ s=s.replace(/\./g,'').replace(',','.'); }
+    else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)){ s=s.replace(/\./g,''); }
     var v=parseFloat(s); return isNaN(v)?0:v;
+  }
+  function celulaCSV(c){
+    var t=String(c==null?'':c);
+    if(/^[=+\-@\t\r]/.test(t)&&isNaN(Number(t))) t="'"+t;
+    return '"'+t.replace(/"/g,'""')+'"';
   }
   function uid(){ return Math.random().toString(36).slice(2,10); }
   var MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -510,9 +517,11 @@
   var KEY_CFG='fin:config';
   var VERSAO=3;
   function keyMes(id){ return 'fin:mes:'+id; }
-  async function sget(k){ try{ var r=await window.storage.get(k); return r?JSON.parse(r.value):null; }catch(e){ return null; } }
+  // só "não existe" (404) vira null; qualquer outro erro (rede, 500, sessão) sobe,
+  // pra nunca confundir falha temporária com "sem dados" e sobrescrever o que já existe
+  async function sget(k){ try{ var r=await window.storage.get(k); }catch(e){ if(e&&e.notFound) return null; throw e; } return r?JSON.parse(r.value):null; }
   async function sset(k,v){ try{ var r=await window.storage.set(k,JSON.stringify(v)); return !!r; }catch(e){ toast('Não consegui salvar. Tente de novo.'); return false; } }
-  async function slist(p){ try{ var r=await window.storage.list(p); return (r&&r.keys)?r.keys:[]; }catch(e){ return []; } }
+  async function slist(p){ var r=await window.storage.list(p); return (r&&r.keys)?r.keys:[]; }
 
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
@@ -1170,6 +1179,7 @@
     var base=baseInvest(inv), rend=atual-base;
     if(rend<=0) return atual;
     var dias=diasEntre(inv.data,hojeISO());
+    if(isNaN(dias)||dias<0) dias=0;
     return atual-rend*aliquotaIR(dias);
   }
 
@@ -1194,6 +1204,12 @@
     var raio=tamanho/2, cx=raio, cy=raio, raioInt=raio*0.62;
     var ang=-90;
     var svg='<svg viewBox="0 0 '+tamanho+' '+tamanho+'" width="'+tamanho+'" height="'+tamanho+'" style="display:block">';
+    var positivas=fatias.filter(function(f){return f.valor>0;});
+    if(positivas.length===1){
+      // um arco de 360° tem início = fim e o SVG não desenha nada — vira um anel
+      svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+((raio+raioInt)/2)+'" fill="none" stroke="'+positivas[0].cor+'" stroke-width="'+(raio-raioInt)+'"><title>'+esc(positivas[0].rotulo)+': '+money(positivas[0].valor)+' (100%)</title></circle></svg>';
+      return svg;
+    }
     fatias.forEach(function(f){
       if(f.valor<=0) return;
       var fracao=f.valor/total;
@@ -1699,11 +1715,11 @@
     h+='<section class="pix-rapido"><div class="sec-head"><h2>Registrar gasto via Pix</h2></div>';
     h+='<div class="sec-note">Adicione um gasto sem procurar pelo fim da página. Ele será salvo como Pix.</div>';
     h+='<div class="adder">';
-    h+='<div class="field"><label for="nl-val">Valor</label><input id="nl-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
-    h+='<div class="field" style="flex:1 1 210px"><label for="nl-desc">Descrição</label><input id="nl-desc" style="width:100%" placeholder="Mercado, combustível…"></div>';
-    h+='<div class="field"><label for="nl-data">Data</label><input id="nl-data" type="date" value="'+esc(dataPadrao())+'"></div>';
-    h+='<div class="field" style="flex:1 1 170px"><label for="nl-cat">Categoria</label><select id="nl-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
-    h+='<button class="addbtn" data-act="add-lanc">Adicionar gasto</button></div></section>';
+    h+='<div class="field"><label for="nq-val">Valor</label><input id="nq-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
+    h+='<div class="field" style="flex:1 1 210px"><label for="nq-desc">Descrição</label><input id="nq-desc" style="width:100%" placeholder="Mercado, combustível…"></div>';
+    h+='<div class="field"><label for="nq-data">Data</label><input id="nq-data" type="date" value="'+esc(dataPadrao())+'"></div>';
+    h+='<div class="field" style="flex:1 1 170px"><label for="nq-cat">Categoria</label><select id="nq-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
+    h+='<button class="addbtn" data-act="add-lanc-rapido">Adicionar gasto</button></div></section>';
 
     // entradas
     var entradasAbertas=secaoMesAberta('entradas');
@@ -1803,6 +1819,7 @@
       });
       h+='</tbody></table>';
     }
+    h+='</div>'; }
     h+='</section>';
 
     return h;
@@ -1877,7 +1894,7 @@
       var st=statusJob(j);
       L.push([mesId,j.data||'',j.cliente,rotTipo(tipoJob(j)),(+j.valor||0).toFixed(2),recebidoJob(j).toFixed(2),abertoJob(j).toFixed(2),st.rot]);
     });
-    var csv='\ufeff'+L.map(function(l){return l.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+    var csv='\ufeff'+L.map(function(l){return l.map(celulaCSV).join(';');}).join('\r\n');
     var a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
     a.download='faturamento-'+mesId+'.csv'; a.click();
@@ -1901,7 +1918,8 @@
     try{
       var texto=await file.text();
       var bundle=JSON.parse(texto);
-      var chaves=Object.keys(bundle);
+      var chaves=Object.keys(bundle).filter(function(k){ return k.indexOf('fin:')===0 && typeof bundle[k]==='string'; });
+      if(!chaves.length){ toast('Esse arquivo não parece um backup deste app.'); return; }
       for(var i=0;i<chaves.length;i++){ await window.storage.set(chaves[i],bundle[chaves[i]]); }
       toast('Backup importado — '+chaves.length+' itens. Recarregando…');
       setTimeout(function(){ location.reload(); },1200);
@@ -1921,7 +1939,7 @@
     L.push([mesId,'Resumo','Total de entradas','','','',totEntradas(mes).toFixed(2),'']);
     L.push([mesId,'Resumo','Total de saídas','','','',totDespesas(mes).toFixed(2),'']);
     L.push([mesId,'Resumo','Sobra','','','',sobra(mes).toFixed(2),'']);
-    var csv='\ufeff'+L.map(function(l){return l.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+    var csv='\ufeff'+L.map(function(l){return l.map(celulaCSV).join(';');}).join('\r\n');
     var a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
     a.download='financas-'+mesId+'.csv'; a.click();
@@ -1984,6 +2002,14 @@
       var novo={id:'c'+uid(),nome:nf,dia:Math.min(Math.max(d,1),31),valor:vf,categoria:cat};
       cfg.contasFixas.push(novo); await sset(KEY_CFG,cfg);
       mes.fixas.push({id:uid(),refId:novo.id,nome:novo.nome,dia:novo.dia,valor:novo.valor,categoria:cat,pago:false});
+      await salvar(); render(); return;
+    }
+    if(act==='add-lanc-rapido'){
+      var descQ=document.getElementById('nq-desc').value.trim(),vlQ=parseNum(document.getElementById('nq-val').value);
+      if(!descQ||!vlQ){ toast('Preencha a descrição e o valor.'); return; }
+      var contaPix=cfg.contas.filter(function(c){return c.tipo==='pix';})[0];
+      mes.lancamentos.push({id:uid(),data:document.getElementById('nq-data').value||mesId+'-01',descricao:descQ,
+        categoria:document.getElementById('nq-cat').value,valor:vlQ,conta:contaPix?contaPix.id:'pix'});
       await salvar(); render(); return;
     }
     if(act==='add-lanc'){
@@ -2258,7 +2284,8 @@
     await corrigirMarco();
     financ=await sget(KEY_FIN)||[];
     investimentos=await sget(KEY_INVEST)||[];
-    mercado=await sget(KEY_MERCADO)||{cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null};
+    mercado=await sget(KEY_MERCADO)||{};
+    mercado={cdi:mercado.cdi||[],selic:mercado.selic||[],acoes:mercado.acoes||{},tesouro:mercado.tesouro||[],atualizadoEm:mercado.atualizadoEm||null};
     if(!meses.length){ await sset(keyMes('2026-08'),mesNovo('2026-08',cfg)); meses=['2026-08']; }
     var alvo=meses.indexOf(hojeId())>-1?hojeId():meses[meses.length-1];
     mesId=alvo; mes=await sget(keyMes(alvo))||mesNovo(alvo,cfg);
@@ -2267,7 +2294,8 @@
     render();
   }
 
-  function erroBoot(){
+  function erroBoot(e){
+    if(e&&e.unauthorized) return;
     document.getElementById('app').innerHTML='<div class="wrap"><p class="boot">Não consegui abrir o armazenamento. Recarregue a página para tentar de novo.</p></div>';
   }
 
@@ -2321,6 +2349,12 @@
     try{ await fetch('/api/logout',{method:'POST'}); }catch(e){}
     location.reload();
   }
+  window.addEventListener('unhandledrejection',function(ev){
+    var r=ev.reason;
+    ev.preventDefault();
+    if(r&&r.unauthorized) return;
+    toast('Sem conexão com o servidor. Nada foi apagado — tente de novo.');
+  });
   window.__sairApp=sair;
   window.__usuarioLogado=function(){ return usuarioLogado; };
   window.__onUnauthorized=function(){ telaLogin(); };
@@ -2331,7 +2365,7 @@
       var data=await resp.json().catch(function(){ return {}; });
       if(resp.ok){ usuarioLogado=data.usuario||null; await iniciar(false); }
       else telaLogin();
-    }catch(e){ erroBoot(); }
+    }catch(e){ erroBoot(e); }
   })().catch(erroBoot);
 })();
 </script>
