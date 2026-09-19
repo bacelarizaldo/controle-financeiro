@@ -634,6 +634,7 @@
   // ---------- leitura de fatura por texto ou imagem ----------
   function promptExtracao(){
     return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, enviado como texto ou imagem.\n'+
+      'Em imagens de aplicativo bancário, cada linha com nome de estabelecimento e valor em R$ é uma compra. Extraia TODAS as compras visíveis, mesmo quando a data vier apenas no cabeçalho acima delas. Por exemplo, "ontem, 17 de maio" vale para todas as linhas seguintes até aparecer outro cabeçalho de data. Textos como "apple pay", "cartão físico" e ícones são apenas detalhes do meio de pagamento, não são compras separadas.\n'+
       'Extraia SOMENTE os gastos (débitos/compras). Ignore pagamentos de fatura, estornos, créditos, saldos, limites, totais da fatura e qualquer linha que não seja uma compra.\n'+
       'Para cada gasto devolva: data (formato AAAA-MM-DD; se o texto não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto, sem incluir a categoria; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+' — se o texto já disser a categoria daquele gasto, use essa categoria informada; só infira pelo nome do estabelecimento quando não vier explícita).\n'+
       'Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown, sem crase. Exemplo: [{"data":"2026-08-12","descricao":"Posto Shell","valor":180.5,"categoria":"Transporte"}]';
@@ -647,6 +648,7 @@
       body:JSON.stringify({content:content})
     });
     var data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||'Não foi possível ler a fatura agora.');
     var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
     txt=txt.replace(/```json/g,'').replace(/```/g,'').trim();
     var ini=txt.indexOf('['), fim=txt.lastIndexOf(']');
@@ -818,7 +820,10 @@
     }
     imp.itens=normalizar(extraidos);
     imp.carregando=false; imp.progresso=null;
-    if(!imp.itens.length) imp.erro='Não encontrei gastos nos prints. Verifique se a fatura está nítida e se as compras aparecem na imagem.';
+    if(!imp.itens.length){
+      imp.itens=null;
+      imp.erro=falhas.length?'Não consegui concluir a leitura do print. Tente enviar novamente; o arquivo não foi salvo.':'Não encontrei compras neste print. Tente enviar novamente — telas com linhas de estabelecimento e valor em R$ são aceitas.';
+    }
     else if(falhas.length) imp.erro='Não consegui ler: '+falhas.join(', ')+'. Os demais lançamentos foram mantidos para revisão.';
     render();
   }
