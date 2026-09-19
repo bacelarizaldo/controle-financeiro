@@ -424,6 +424,16 @@
   @media (max-width:480px){
     table{border-spacing:0 6px}td{padding:11px 7px}td:first-child{padding-left:11px}.adder{padding:13px}.hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-cell{padding-bottom:4px}.sec-total{font-size:16px}
   }
+  /* Tabela de faturamento: preserva largura suficiente para valores editáveis. */
+  .tabela-scroll{padding-bottom:2px}
+  .jobs-table{min-width:920px;table-layout:fixed}
+  .jobs-table th:nth-child(1){width:64px}.jobs-table th:nth-child(2){width:250px}
+  .jobs-table th:nth-child(3),.jobs-table th:nth-child(4),.jobs-table th:nth-child(5){width:128px}
+  .jobs-table th:nth-child(6){width:104px}.jobs-table th:nth-child(7){width:34px}
+  #app .jobs-table .inline-val{width:112px;max-width:100%;padding-left:5px;padding-right:5px}
+  .aba-valores{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--rule);box-shadow:var(--shadow-sm);color:var(--ink)}
+  .aba-valores:hover{background:#fff;color:var(--ink)}
+  @media(max-width:620px){.aba-valores{position:sticky;right:0;font-size:0;padding:9px 11px}.aba-valores .eye-icon{font-size:16px}}
 </style>
 
 <script>
@@ -865,7 +875,7 @@
       lista=lista.slice().sort(function(a,b){
         return (ordemTipo[tipoJob(a)]-ordemTipo[tipoJob(b)]) || (a.data||'').localeCompare(b.data||'') || a.cliente.localeCompare(b.cliente);
       });
-      h+='<div class="tabela-scroll"><table><thead><tr><th style="width:64px">Data</th><th>Cliente / job</th><th class="r">Orçamento</th><th class="r">Recebido</th><th class="r">Falta receber</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
+      h+='<div class="tabela-scroll"><table class="jobs-table"><thead><tr><th>Data</th><th>Cliente / job</th><th class="r">Orçamento</th><th class="r">Recebido</th><th class="r">Falta receber</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
       var totOrc=0,totRec=0,totFal=0;
       lista.forEach(function(j){
         var st=statusJob(j), ab=abertoJob(j);
@@ -1719,12 +1729,12 @@
 
   function render(){
     var h='<button class="hamburger" data-act="toggle-menu" aria-label="Abrir menu">☰</button>';
-    h+='<button class="hamburger olho" data-act="toggle-valores" aria-label="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'" title="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'">'+(valoresOcultos?'🙈':'👁')+'</button>';
     h+='<div class="wrap">';
     h+='<nav class="abas">';
     [['mes','Mês a mês'],['resumo','Resumo'],['jobs','Faturamento'],['cartoes','Cartões'],['financ','Financiamentos'],['invest','Investimentos']].forEach(function(a){
       h+='<button class="aba" data-vista="'+a[0]+'" aria-pressed="'+(vista===a[0])+'">'+a[1]+'</button>';
     });
+    h+='<button class="aba aba-valores" data-act="toggle-valores" aria-label="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'" title="'+(valoresOcultos?'Mostrar valores':'Ocultar valores')+'"><span class="eye-icon">'+(valoresOcultos?'🙈':'👁')+'</span><span>'+ (valoresOcultos?'Mostrar valores':'Ocultar valores') +'</span></button>';
     h+='</nav>';
     h+= vista==='jobs' ? viewJobs() : (vista==='cartoes' ? viewCartoes() : (vista==='financ' ? viewFinanc() : (vista==='invest' ? viewInvest() : (vista==='resumo' ? viewResumo() : viewMes()))));
     h+='<div class="rodape">Seus dados ficam salvos só para você e continuam aqui quando voltar. Ainda assim, baixe o CSV de vez em quando — é o seu backup.</div></div>';
