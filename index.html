@@ -236,6 +236,14 @@
   .import{border:1px solid var(--rule-soft);border-radius:var(--radius-md);background:#F8F9F5;padding:18px 20px;margin-bottom:6px}
   .import h3{margin:0 0 3px;font-size:14.5px;font-weight:600}
   .import p{margin:0 0 13px;font-size:13px;color:var(--muted);max-width:66ch}
+  .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;padding:34px 18px;border:2px dashed #BFC7BC;border-radius:var(--radius-md);background:#fff;color:var(--muted);text-align:center;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+  .dropzone:hover,.dropzone:focus-visible,.dropzone.sobre{border-color:var(--ink);background:#F3F6F0;color:var(--ink);outline:none}
+  .dropzone.sobre{border-style:solid;box-shadow:var(--ring)}
+  .dropzone .dz-icone{margin-bottom:2px}
+  .dropzone .dz-titulo{font-size:15px;font-weight:600;color:var(--ink)}
+  .dropzone .dz-sub{font-size:12.5px;color:var(--muted)}
+  .dropzone .dz-toque{display:none}
+  @media (hover:none),(pointer:coarse){.dropzone .dz-desktop{display:none}.dropzone .dz-toque{display:inline}}
   .imp-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px}
   textarea{width:100%;min-height:92px;border:1px solid var(--rule);border-radius:var(--radius-sm);padding:10px 12px;background:#fff;resize:vertical;font-size:14px;line-height:1.5;transition:border-color .15s,box-shadow .15s}
   .lendo{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:18px 0}
@@ -569,24 +577,6 @@
     for(var i=0;i<REGRAS_CATEGORIA.length;i++){ if(REGRAS_CATEGORIA[i][1].test(d)) return REGRAS_CATEGORIA[i][0]; }
     return 'Outros';
   }
-  function semAcento(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
-  var MAPA_CAT_NORM=(function(){ var m={}; CATEGORIAS.forEach(function(c){ m[semAcento(c)]=c; }); return m; })();
-  var RX_SEP_TOKEN=/^[-–—•|,;:]+$/;
-  function limpaToken(t){ return String(t||'').replace(/^[-–—•|,;:()]+/,'').replace(/[-–—•|,;:()]+$/,''); }
-  function extraiCategoriaExplicita(l){
-    var tokens=l.split(/\s+/);
-    for(var i=0;i<tokens.length;i++){
-      var chave=semAcento(limpaToken(tokens[i]));
-      if(MAPA_CAT_NORM[chave]){
-        var cat=MAPA_CAT_NORM[chave];
-        tokens.splice(i,1);
-        if(i>0&&RX_SEP_TOKEN.test(tokens[i-1])) tokens.splice(i-1,1);
-        else if(i<tokens.length&&RX_SEP_TOKEN.test(tokens[i])) tokens.splice(i,1);
-        return {categoria:cat, resto:tokens.join(' ').trim()};
-      }
-    }
-    return null;
-  }
 
   function cfgSemente(){
     return {
@@ -652,17 +642,17 @@
     return mesId+'-01';
   }
 
-  // ---------- leitura de fatura por texto ou imagem ----------
+  // ---------- leitura de fatura por imagem ----------
   function promptExtracao(){
-    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, enviado como texto ou imagem.\n'+
+    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, enviado como imagem (print).\n'+
       'Em imagens de aplicativo bancário, cada linha com nome de estabelecimento e valor em R$ é uma compra. Extraia TODAS as compras visíveis, mesmo quando a data vier apenas no cabeçalho acima delas. Por exemplo, "ontem, 17 de maio" vale para todas as linhas seguintes até aparecer outro cabeçalho de data. Textos como "apple pay", "cartão físico" e ícones são apenas detalhes do meio de pagamento, não são compras separadas.\n'+
       'Extraia SOMENTE os gastos (débitos/compras). Ignore pagamentos de fatura, estornos, créditos, saldos, limites, totais da fatura e qualquer linha que não seja uma compra.\n'+
-      'Para cada gasto devolva: data (formato AAAA-MM-DD; se o texto não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto, sem incluir a categoria; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+' — se o texto já disser a categoria daquele gasto, use essa categoria informada; só infira pelo nome do estabelecimento quando não vier explícita).\n'+
+      'Para cada gasto devolva: data (formato AAAA-MM-DD; se a imagem não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto, sem incluir a categoria; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+' — escolha a que melhor descreve o gasto pelo nome do estabelecimento).\n'+
       'Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown, sem crase. Exemplo: [{"data":"2026-08-12","descricao":"Posto Shell","valor":180.5,"categoria":"Transporte"}]';
   }
 
   async function lerComIA(entrada){
-    var content=Array.isArray(entrada)?entrada:[{type:'text',text:'Extrato colado:\n'+entrada}];
+    var content=entrada.slice();
     content.push({type:'text',text:promptExtracao()});
     var resp=await fetch('/api/read-receipt',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -685,34 +675,6 @@
     var arr=JSON.parse(txt);
     if(!Array.isArray(arr)) throw new Error('formato');
     return arr;
-  }
-
-  var NAO_GASTO=/pagamento|estorno|cr[ée]dito|limite|saldo|dispon[íi]vel|total da fatura|fatura anterior|fatura fechada|transfer[êe]ncia recebida|recebid/i;
-
-  function lerTextoLocal(texto){
-    var out=[];
-    texto.split(/\n+/).forEach(function(linha){
-      var l=linha.trim(); if(!l) return;
-      if(NAO_GASTO.test(l)) return;
-      var catExplicita=null;
-      var achou=extraiCategoriaExplicita(l);
-      if(achou){ catExplicita=achou.categoria; l=achou.resto; }
-      var mv=l.match(/(-?\s*(?:R\$)?\s*\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})\s*$/);
-      if(!mv) return;
-      var valor=parseNum(mv[1]); if(!valor) return;
-      var resto=l.slice(0,l.length-mv[0].length).trim();
-      var md=resto.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
-      var data=mesId+'-01';
-      if(md){
-        var ano=md[3]?(md[3].length===2?'20'+md[3]:md[3]):mesId.split('-')[0];
-        data=ano+'-'+String(md[2]).padStart(2,'0')+'-'+String(md[1]).padStart(2,'0');
-        resto=resto.slice(md[0].length).trim();
-      }
-      resto=resto.replace(/^[\-–•|,;]+/,'').trim();
-      if(!resto) resto='Gasto';
-      out.push({data:data,descricao:resto,valor:Math.abs(valor),categoria:catExplicita||categoriaAuto(resto)});
-    });
-    return out;
   }
 
   var RX_PARCELA=/\(?\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\)?\s*$/;
@@ -781,20 +743,6 @@
       var pc=detectaParcela(desc);
       return {tid:uid(),data:d,descricao:desc,valor:Math.abs(+x.valor||0),categoria:cat,usar:true,parcelado:!!pc,parcelaInfo:pc?(pc.atual+'/'+pc.total):''};
     }).filter(function(x){ return x.valor>0; });
-  }
-
-  async function processar(texto){
-    imp.carregando=true; imp.erro=null; imp.itens=null; render();
-    try{
-      var arr=await lerComIA(texto);
-      imp.itens=normalizar(arr);
-      if(!imp.itens.length) imp.erro='Não encontrei nenhum gasto nesse texto.';
-    }catch(e){
-      var loc=normalizar(lerTextoLocal(texto));
-      if(loc.length){ imp.itens=loc; imp.erro='Li o texto sem a ajuda da IA, então as categorias foram um chute a partir do nome. Confira antes de lançar.'; }
-      else imp.erro='Não consegui entender esse texto. Cada linha precisa ter um valor no formato 47,90 — data e categoria são opcionais.';
-    }
-    imp.carregando=false; render();
   }
 
   function reduzirImagemFatura(arquivo){
@@ -1540,7 +1488,7 @@
 
     h+='<section><div class="sec-head"><h2>Importar fatura</h2></div>';
     h+='<div class="import" id="painelImport">';
-    h+='<p>Envie os prints da fatura ou cole o texto. Os prints são reduzidos e lidos um por vez; não ficam salvos no sistema. Confira os gastos antes de lançar. Compras com parcela tipo “2/6” são detectadas sozinhas.</p>';
+    h+='<p>Envie os prints da fatura na área abaixo. Os prints são reduzidos e lidos um por vez; não ficam salvos no sistema. Confira os gastos antes de lançar. Compras com parcela tipo “2/6” são detectadas sozinhas.</p>';
     h+='<div class="imp-row"><div class="field"><label for="imp-conta">Esses gastos são do</label><select id="imp-conta">';
     cartoes.forEach(function(c){ h+='<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>'; });
     h+='</select></div></div>';
@@ -1551,9 +1499,12 @@
       if(imp.erro) h+='<div class="erro">'+esc(imp.erro)+'</div>';
       if(!imp.itens){
         h+='<input type="file" id="imp-imagens" accept="image/jpeg,image/png,image/webp" multiple style="display:none">';
-        h+='<div class="rev-acoes"><button class="addbtn" data-act="selecionar-imagens">Enviar prints da fatura</button><span class="rev-info">Até 6 imagens · JPG, PNG ou WebP</span></div>';
-        h+='<textarea id="imp-texto" placeholder="12/08  IFOOD  47,90  Alimentação&#10;13/08  AMAZON (2/6)  1.299,00"></textarea>';
-        h+='<div class="rev-acoes"><button class="addbtn" data-act="ler-texto">Ler texto</button></div>';
+        h+='<button type="button" class="dropzone" id="dropzone" data-act="selecionar-imagens">'+
+          '<svg class="dz-icone" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>'+
+          '<span class="dz-titulo dz-desktop">Arraste os prints da fatura aqui</span>'+
+          '<span class="dz-titulo dz-toque">Toque para enviar os prints da fatura</span>'+
+          '<span class="dz-sub"><span class="dz-desktop">ou clique para escolher os arquivos · </span>até 6 imagens · JPG, PNG ou WebP</span>'+
+          '</button>';
       }
     }
     if(imp.itens&&imp.itens.length){
@@ -2021,11 +1972,6 @@
       if(pc) await propagarParcelas({data:dataC,categoria:catC,valor:vlC,conta:contaC,descricao:descC},pc);
       render(); return;
     }
-    if(act==='ler-texto'){
-      var tx=document.getElementById('imp-texto').value.trim();
-      if(!tx){ toast('Cole o texto dos gastos primeiro.'); return; }
-      await processar(tx); return;
-    }
     if(act==='selecionar-imagens'){
       var campoImagens=document.getElementById('imp-imagens');
       if(campoImagens) campoImagens.click();
@@ -2138,6 +2084,39 @@
       await iniciar(true); return;
     }
     if(act==='sair'){ menuAberto=false; await window.__sairApp(); return; }
+  });
+
+  function soImagens(lista){
+    return Array.prototype.slice.call(lista||[]).filter(function(f){ return /^image\/(jpeg|png|webp)$/.test(f.type); });
+  }
+  function arrastandoArquivos(ev){ var t=ev.dataTransfer&&ev.dataTransfer.types; return !!t&&Array.prototype.indexOf.call(t,'Files')>-1; }
+  document.addEventListener('dragenter',function(ev){
+    if(!arrastandoArquivos(ev)) return;
+    ev.preventDefault();
+    var z=ev.target.closest&&ev.target.closest('.dropzone'); if(z) z.classList.add('sobre');
+  });
+  document.addEventListener('dragover',function(ev){
+    if(!arrastandoArquivos(ev)) return;
+    ev.preventDefault();
+    var z=ev.target.closest&&ev.target.closest('.dropzone');
+    ev.dataTransfer.dropEffect=z?'copy':'none';
+    if(z) z.classList.add('sobre');
+  });
+  document.addEventListener('dragleave',function(ev){
+    var z=ev.target.closest&&ev.target.closest('.dropzone');
+    if(z&&!(ev.relatedTarget&&z.contains(ev.relatedTarget))) z.classList.remove('sobre');
+  });
+  document.addEventListener('drop',async function(ev){
+    if(!arrastandoArquivos(ev)) return;
+    ev.preventDefault();
+    var z=ev.target.closest&&ev.target.closest('.dropzone');
+    if(!z) return;
+    z.classList.remove('sobre');
+    if(imp.carregando) return;
+    var imagens=soImagens(ev.dataTransfer.files);
+    if(!imagens.length){ toast('Envie imagens JPG, PNG ou WebP.'); return; }
+    if(imagens.length<ev.dataTransfer.files.length) toast('Só imagens são lidas — os outros arquivos foram ignorados.');
+    await processarImagens(imagens);
   });
 
   document.addEventListener('change',async function(ev){
