@@ -433,7 +433,13 @@
   #app .jobs-table .inline-val{width:112px;max-width:100%;padding-left:5px;padding-right:5px}
   .aba-valores{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--rule);box-shadow:var(--shadow-sm);color:var(--ink)}
   .aba-valores:hover{background:#fff;color:var(--ink)}
+  .sec-recolhivel{padding:0;overflow:hidden}
+  .sec-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:20px 24px;border:0;background:#fff;color:var(--ink);font:inherit;text-align:left}
+  .sec-toggle:hover{background:#FAFAF8}.sec-toggle h2{margin:0;font-family:var(--sans);font-size:20px;font-weight:730;letter-spacing:-.04em}
+  .sec-toggle-info{display:flex;align-items:center;gap:12px}.sec-toggle .chev{font-size:20px}.sec-recolhivel-conteudo{padding:0 24px 21px}
+  .pix-rapido{background:linear-gradient(135deg,#F0F5E8,#FFFFFF);border-color:#DEE8CF}.pix-rapido .sec-head{margin-bottom:8px}.pix-rapido .sec-head h2:before{content:'↗';display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#A9CE46;color:#173000;font-size:16px;vertical-align:1px}.pix-rapido .adder{background:rgba(255,255,255,.76)}
   @media(max-width:620px){.aba-valores{position:sticky;right:0;font-size:0;padding:9px 11px}.aba-valores .eye-icon{font-size:16px}}
+  @media(max-width:620px){.sec-toggle{padding:17px 16px}.sec-toggle h2{font-size:18px}.sec-recolhivel-conteudo{padding:0 16px 17px}.pix-rapido .sec-head h2{font-size:18px}}
 </style>
 
 <script>
@@ -511,6 +517,7 @@
   var cfg=null,mes=null,mesId=null,meses=[],filtroCat='todas';
   var vista='mes', jobs=[], financ=[], filtroTipo='todos';
   var cardsAbertos={};
+  var secoesMesAbertas={};
   var menuAberto=false;
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
   var investimentos=[], mercado={cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
@@ -620,6 +627,11 @@
   function totConta(m,cid){ return m.lancamentos.filter(function(l){return l.conta===cid;}).reduce(function(a,l){return a+(+l.valor||0);},0); }
   function nomeConta(id){ var c=cfg.contas.filter(function(x){return x.id===id;})[0]; return c?c.nome:id; }
   function tipoConta(id){ var c=cfg.contas.filter(function(x){return x.id===id;})[0]; return c?c.tipo:'pix'; }
+  function secaoMesAberta(chave){ return !!secoesMesAbertas[chave]; }
+  function cabecalhoSecaoMes(chave,titulo,total){
+    var aberto=secaoMesAberta(chave);
+    return '<button type="button" class="sec-toggle" data-toggle-secao="'+chave+'" aria-expanded="'+aberto+'"><h2>'+titulo+'</h2><span class="sec-toggle-info"><span class="sec-total">'+total+'</span><span class="chev'+(aberto?' aberto':'')+'">›</span></span></button>';
+  }
   function statusFixa(f){
     if(f.pago) return 'pago';
     if(mesId<hojeId()) return 'vencido';
@@ -1683,8 +1695,20 @@
     if(+m.repasse) h+='<div class="hero-cell"><span>Veio do mês anterior</span><b>'+moneyExib(m.repasse)+'</b></div>';
     h+='</div></div>';
 
+    // lançamento rápido: sempre via Pix e visível logo após o saldo
+    h+='<section class="pix-rapido"><div class="sec-head"><h2>Registrar gasto via Pix</h2></div>';
+    h+='<div class="sec-note">Adicione um gasto sem procurar pelo fim da página. Ele será salvo como Pix.</div>';
+    h+='<div class="adder">';
+    h+='<div class="field"><label for="nl-val">Valor</label><input id="nl-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
+    h+='<div class="field" style="flex:1 1 210px"><label for="nl-desc">Descrição</label><input id="nl-desc" style="width:100%" placeholder="Mercado, combustível…"></div>';
+    h+='<div class="field"><label for="nl-data">Data</label><input id="nl-data" type="date" value="'+esc(dataPadrao())+'"></div>';
+    h+='<div class="field" style="flex:1 1 170px"><label for="nl-cat">Categoria</label><select id="nl-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
+    h+='<button class="addbtn" data-act="add-lanc">Adicionar gasto</button></div></section>';
+
     // entradas
-    h+='<section><div class="sec-head"><h2>Entradas</h2><span class="sec-total">'+moneyExib(ent)+'</span></div><table><tbody>';
+    var entradasAbertas=secaoMesAberta('entradas');
+    h+='<section class="sec-recolhivel">'+cabecalhoSecaoMes('entradas','Entradas',moneyExib(ent));
+    if(entradasAbertas){ h+='<div class="sec-recolhivel-conteudo"><table><tbody>';
     var nj=jobsDoMes(mesId);
     if(nj.length){
       var rotIB=mesId>='2026-09';
@@ -1699,10 +1723,13 @@
     });
     h+='</tbody></table>';
     if(semEntrada) h+='<div class="vazio">Nenhuma entrada lançada ainda. Jobs fechados para este mês aparecem aqui sozinhos.</div>';
+    h+='</div>'; }
     h+='</section>';
 
     // contas fixas
-    h+='<section><div class="sec-head"><h2>Contas fixas</h2><span class="sec-total">'+moneyExib(totFixas(m))+'</span></div>';
+    var fixasAbertas=secaoMesAberta('fixas');
+    h+='<section class="sec-recolhivel">'+cabecalhoSecaoMes('fixas','Contas fixas',moneyExib(totFixas(m)));
+    if(fixasAbertas){ h+='<div class="sec-recolhivel-conteudo">';
     h+='<table><thead><tr><th>Conta</th><th class="hide-sm">Categoria</th><th class="hide-sm">Vencimento</th><th class="r">Valor</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
     m.fixas.slice().sort(function(a,b){return a.dia-b.dia;}).forEach(function(f){
       var st=statusFixa(f), rot=st==='pago'?'Pago':(st==='vencido'?'Venceu':'A pagar');
@@ -1719,28 +1746,34 @@
     h+='<div class="field" style="flex:1 1 auto"><label for="nf-cat">Categoria</label><select id="nf-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div></div>';
     h+='<div class="field"><label for="nf-val">Valor</label><input id="nf-val" class="w-val" placeholder="R$ 0,00"></div>';
     h+='<button class="addbtn" data-act="add-fixa">Adicionar conta fixa</button></div>';
-    h+='<div class="sec-note" style="font-size:12px">Contas fixas se repetem sozinhas quando você abre o próximo mês, já como “a pagar”.</div></section>';
+    h+='<div class="sec-note" style="font-size:12px">Contas fixas se repetem sozinhas quando você abre o próximo mês, já como “a pagar”.</div></div>'; }
+    h+='</section>';
 
     // cartões (subgrupo — soma por cartão, detalhe fica na aba Cartões)
     var cartoesMes=cfg.contas.filter(function(c){return c.tipo==='cartao';});
     var totCartoesMes=cartoesMes.reduce(function(a,c){return a+totConta(m,c.id);},0);
     if(cartoesMes.length){
-      h+='<section><div class="sec-head"><h2>Cartões</h2><span class="sec-total">'+moneyExib(totCartoesMes)+'</span></div>';
+      var cartoesAbertos=secaoMesAberta('cartoes');
+      h+='<section class="sec-recolhivel">'+cabecalhoSecaoMes('cartoes','Cartões',moneyExib(totCartoesMes));
+      if(cartoesAbertos){ h+='<div class="sec-recolhivel-conteudo">';
       h+='<table><tbody>';
       cartoesMes.forEach(function(c){
         h+='<tr><td class="nome">'+esc(c.nome)+'</td><td class="r val">'+moneyExib(totConta(m,c.id))+'</td>';
         h+='<td class="r" style="width:34px"><button class="linkjob" data-vista="cartoes" title="Ver no detalhe dos cartões">ver</button></td></tr>';
       });
       h+='</tbody></table>';
-      h+='<div class="sec-note">Já contado nas saídas do mês — aqui é só a soma por cartão. O detalhe de cada compra fica na aba Cartões.</div></section>';
+      h+='<div class="sec-note">Já contado nas saídas do mês — aqui é só a soma por cartão. O detalhe de cada compra fica na aba Cartões.</div></div>'; }
+      h+='</section>';
     }
 
     // gastos (dinheiro / pix — os de cartão ficam na aba Cartões)
     var lancsTodos=m.lancamentos.slice().sort(function(a,b){return (b.data||'').localeCompare(a.data||'');});
     var lancs=lancsTodos.filter(function(l){ return tipoConta(l.conta)!=='cartao'; });
     var vis=filtroCat==='todas'?lancs:lancs.filter(function(l){return l.categoria===filtroCat;});
-    h+='<section><div class="sec-head"><h2>Gastos do mês</h2><span class="sec-total">'+moneyExib(lancs.reduce(function(a,l){return a+(+l.valor||0);},0))+'</span></div>';
-    h+='<div class="sec-note">Dinheiro, débito e Pix. Compras no cartão ficam na aba Cartões, mas já entram na conta das saídas do mês.</div>';
+    var gastosAbertos=secaoMesAberta('gastos');
+    h+='<section class="sec-recolhivel">'+cabecalhoSecaoMes('gastos','Gastos via Pix',moneyExib(lancs.reduce(function(a,l){return a+(+l.valor||0);},0)));
+    if(gastosAbertos){ h+='<div class="sec-recolhivel-conteudo">';
+    h+='<div class="sec-note">Compras no cartão ficam na aba Cartões. Aqui aparecem os gastos registrados via Pix.</div>';
 
     var cats=CATEGORIAS.filter(function(c){return lancs.some(function(l){return l.categoria===c;});});
     if(cats.length>1){
