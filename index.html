@@ -1951,6 +1951,7 @@
     var app=document.getElementById('app'); if(!app||!app.contains(t)) return;
 
     if(t.dataset.toggleCard){ var kc=t.dataset.toggleCard; cardsAbertos[kc]=!cardsAbertos[kc]; render(); return; }
+    if(t.dataset.toggleSecao){ var ks=t.dataset.toggleSecao; secoesMesAbertas[ks]=!secoesMesAbertas[ks]; render(); return; }
     if(t.dataset.act==='toggle-menu'){ menuAberto=!menuAberto; render(); return; }
     if(t.dataset.act==='toggle-valores'){ valoresOcultos=!valoresOcultos; render(); return; }
     if(t.dataset.act==='fechar-menu'){ menuAberto=false; render(); return; }
