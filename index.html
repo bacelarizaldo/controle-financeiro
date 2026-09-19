@@ -668,9 +668,17 @@
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({content:content})
     });
-    var data=await resp.json();
-    if(!resp.ok) throw new Error(data.error||'Não foi possível ler a fatura agora.');
-    var txt=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+    var data=null;
+    try{ data=await resp.json(); }catch(e){}
+    if(!resp.ok){
+      var motivo=data&&data.error;
+      if(motivo&&typeof motivo==='object') motivo=motivo.message;
+      if(resp.status===401) motivo='Sessão expirada — entre de novo.';
+      else if(resp.status===413) motivo='Imagem grande demais para enviar.';
+      var err=new Error(motivo||('O servidor respondeu erro '+resp.status+'.'));
+      err.status=resp.status; throw err;
+    }
+    var txt=((data&&data.content)||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
     txt=txt.replace(/```json/g,'').replace(/```/g,'').trim();
     var ini=txt.indexOf('['), fim=txt.lastIndexOf(']');
     if(ini>-1&&fim>ini) txt=txt.slice(ini,fim+1);
@@ -801,7 +809,8 @@
           var ctx=canvas.getContext('2d');
           ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,canvas.width,canvas.height);
           ctx.drawImage(imagem,0,0,canvas.width,canvas.height);
-          URL.revokeObjectURL(url); imagem.src=''; imagem=null;
+          // sem isto, limpar o src dispara onerror e rejeita a leitura mesmo com a imagem já desenhada
+          imagem.onload=null; imagem.onerror=null; URL.revokeObjectURL(url); imagem.src=''; imagem=null;
           canvas.toBlob(function(blob){
             if(!blob){ reject(new Error('compressão')); return; }
             var leitor=new FileReader();
@@ -823,7 +832,7 @@
 
   async function processarImagens(arquivos){
     var limiteArquivos=6, maxOriginal=8*1024*1024;
-    var lista=arquivos.slice(0,limiteArquivos), extraidos=[], falhas=[];
+    var lista=arquivos.slice(0,limiteArquivos), extraidos=[], falhas=[], ultimoErro='';
     if(arquivos.length>limiteArquivos) toast('Vou ler os primeiros '+limiteArquivos+' prints.');
     arquivos=null;
     imp.carregando=true; imp.erro=null; imp.itens=null; imp.progresso={atual:0,total:lista.length}; render();
@@ -836,14 +845,17 @@
         var arr=await lerComIA([imagem]);
         imagem=null;
         extraidos=extraidos.concat(arr);
-      }catch(e){ falhas.push(arquivo.name||('print '+(i+1))); }
+      }catch(e){
+        falhas.push(arquivo.name||('print '+(i+1)));
+        ultimoErro=e&&e.message==='arquivo grande'?'arquivo maior que 8 MB':(e&&e.message)||'';
+      }
       finally{ lista[i]=null; arquivo=null; }
     }
     imp.itens=normalizar(extraidos);
     imp.carregando=false; imp.progresso=null;
     if(!imp.itens.length){
       imp.itens=null;
-      imp.erro=falhas.length?'Não consegui concluir a leitura do print. Tente enviar novamente; o arquivo não foi salvo.':'Não encontrei compras neste print. Tente enviar novamente — telas com linhas de estabelecimento e valor em R$ são aceitas.';
+      imp.erro=falhas.length?'Não consegui ler o print'+(ultimoErro?' ('+ultimoErro+')':'')+'. Tente de novo; o arquivo não foi salvo.':'Não encontrei compras neste print. Tente enviar novamente — telas com linhas de estabelecimento e valor em R$ são aceitas.';
     }
     else if(falhas.length) imp.erro='Não consegui ler: '+falhas.join(', ')+'. Os demais lançamentos foram mantidos para revisão.';
     render();
@@ -1538,7 +1550,7 @@
     }else{
       if(imp.erro) h+='<div class="erro">'+esc(imp.erro)+'</div>';
       if(!imp.itens){
-        h+='<input type="file" id="imp-imagens" accept="image/jpeg,image/png,image/webp" multiple capture="environment" style="display:none">';
+        h+='<input type="file" id="imp-imagens" accept="image/jpeg,image/png,image/webp" multiple style="display:none">';
         h+='<div class="rev-acoes"><button class="addbtn" data-act="selecionar-imagens">Enviar prints da fatura</button><span class="rev-info">Até 6 imagens · JPG, PNG ou WebP</span></div>';
         h+='<textarea id="imp-texto" placeholder="12/08  IFOOD  47,90  Alimentação&#10;13/08  AMAZON (2/6)  1.299,00"></textarea>';
         h+='<div class="rev-acoes"><button class="addbtn" data-act="ler-texto">Ler texto</button></div>';
