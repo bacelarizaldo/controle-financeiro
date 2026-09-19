@@ -6,6 +6,8 @@ const { exigirAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   if (!exigirAuth(req, res)) return;
+  // A resposta pode conter informação financeira extraída da fatura; não cachear.
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método não permitido' });
     return;
@@ -21,8 +23,17 @@ module.exports = async function handler(req, res) {
 
   try {
     const { content } = req.body || {};
-    if (!content) {
+    if (!Array.isArray(content) || !content.length) {
       res.status(400).json({ error: 'Conteúdo ausente na requisição.' });
+      return;
+    }
+
+    // O cliente envia apenas uma imagem já comprimida por vez. A rota não
+    // grava arquivo nem base64: o conteúdo existe só nesta requisição.
+    const imagens = content.filter((item) => item && item.type === 'image');
+    const bytesImagem = imagens.reduce((total, item) => total + String(item.source && item.source.data || '').length, 0);
+    if (imagens.length > 1 || bytesImagem > 2200000) {
+      res.status(413).json({ error: 'Imagem muito grande. Envie um print por vez.' });
       return;
     }
 

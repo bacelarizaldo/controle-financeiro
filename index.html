@@ -631,16 +631,17 @@
     return mesId+'-01';
   }
 
-  // ---------- leitura de texto colado ----------
+  // ---------- leitura de fatura por texto ou imagem ----------
   function promptExtracao(){
-    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, colado como texto.\n'+
+    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, enviado como texto ou imagem.\n'+
       'Extraia SOMENTE os gastos (débitos/compras). Ignore pagamentos de fatura, estornos, créditos, saldos, limites, totais da fatura e qualquer linha que não seja uma compra.\n'+
       'Para cada gasto devolva: data (formato AAAA-MM-DD; se o texto não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto, sem incluir a categoria; se houver parcela mantenha no formato "Nome (2/6)"), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+' — se o texto já disser a categoria daquele gasto, use essa categoria informada; só infira pelo nome do estabelecimento quando não vier explícita).\n'+
       'Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown, sem crase. Exemplo: [{"data":"2026-08-12","descricao":"Posto Shell","valor":180.5,"categoria":"Transporte"}]';
   }
 
-  async function lerComIA(texto){
-    var content=[{type:'text',text:'Extrato colado:\n'+texto},{type:'text',text:promptExtracao()}];
+  async function lerComIA(entrada){
+    var content=Array.isArray(entrada)?entrada:[{type:'text',text:'Extrato colado:\n'+entrada}];
+    content.push({type:'text',text:promptExtracao()});
     var resp=await fetch('/api/read-receipt',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({content:content})
@@ -763,6 +764,63 @@
       else imp.erro='Não consegui entender esse texto. Cada linha precisa ter um valor no formato 47,90 — data e categoria são opcionais.';
     }
     imp.carregando=false; render();
+  }
+
+  function reduzirImagemFatura(arquivo){
+    return new Promise(function(resolve,reject){
+      var url=URL.createObjectURL(arquivo), imagem=new Image();
+      imagem.onload=function(){
+        try{
+          var limite=1600, escala=Math.min(1,limite/Math.max(imagem.naturalWidth,imagem.naturalHeight));
+          var canvas=document.createElement('canvas');
+          canvas.width=Math.max(1,Math.round(imagem.naturalWidth*escala));
+          canvas.height=Math.max(1,Math.round(imagem.naturalHeight*escala));
+          var ctx=canvas.getContext('2d');
+          ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(imagem,0,0,canvas.width,canvas.height);
+          URL.revokeObjectURL(url); imagem.src=''; imagem=null;
+          canvas.toBlob(function(blob){
+            if(!blob){ reject(new Error('compressão')); return; }
+            var leitor=new FileReader();
+            leitor.onload=function(){
+              var base64=String(leitor.result||'').split(',')[1];
+              canvas.width=1; canvas.height=1; canvas=null;
+              if(!base64){ reject(new Error('leitura')); return; }
+              resolve({type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}});
+            };
+            leitor.onerror=function(){ reject(new Error('leitura')); };
+            leitor.readAsDataURL(blob);
+          },'image/jpeg',.78);
+        }catch(e){ URL.revokeObjectURL(url); reject(e); }
+      };
+      imagem.onerror=function(){ URL.revokeObjectURL(url); reject(new Error('imagem inválida')); };
+      imagem.src=url;
+    });
+  }
+
+  async function processarImagens(arquivos){
+    var limiteArquivos=6, maxOriginal=8*1024*1024;
+    var lista=arquivos.slice(0,limiteArquivos), extraidos=[], falhas=[];
+    if(arquivos.length>limiteArquivos) toast('Vou ler os primeiros '+limiteArquivos+' prints.');
+    arquivos=null;
+    imp.carregando=true; imp.erro=null; imp.itens=null; imp.progresso={atual:0,total:lista.length}; render();
+    for(var i=0;i<lista.length;i++){
+      imp.progresso={atual:i+1,total:lista.length}; render();
+      var arquivo=lista[i];
+      try{
+        if(arquivo.size>maxOriginal) throw new Error('arquivo grande');
+        var imagem=await reduzirImagemFatura(arquivo);
+        var arr=await lerComIA([imagem]);
+        imagem=null;
+        extraidos=extraidos.concat(arr);
+      }catch(e){ falhas.push(arquivo.name||('print '+(i+1))); }
+      finally{ lista[i]=null; arquivo=null; }
+    }
+    imp.itens=normalizar(extraidos);
+    imp.carregando=false; imp.progresso=null;
+    if(!imp.itens.length) imp.erro='Não encontrei gastos nos prints. Verifique se a fatura está nítida e se as compras aparecem na imagem.';
+    else if(falhas.length) imp.erro='Não consegui ler: '+falhas.join(', ')+'. Os demais lançamentos foram mantidos para revisão.';
+    render();
   }
 
   var TIPOS=[{id:'recorrente',rot:'Recorrente'},{id:'avulso',rot:'Avulso'},{id:'freela',rot:'Freela'}];
@@ -1435,18 +1493,20 @@
     });
     h+='</div>';
 
-    h+='<section><div class="sec-head"><h2>Lançar pelo texto</h2></div>';
+    h+='<section><div class="sec-head"><h2>Importar fatura</h2></div>';
     h+='<div class="import" id="painelImport">';
-    h+='<p>Copie os lançamentos da fatura (do app do banco ou de um extrato) e cole abaixo. Se quiser, já escreva a categoria de cada gasto na própria linha (ex.: Alimentação, Transporte…) que ela é reconhecida do jeito que você escreveu; se não escrever, a categoria é adivinhada pelo nome do estabelecimento. Compras com parcela tipo “2/6” são detectadas sozinhas, e as parcelas seguintes já são lançadas nos próximos meses — você só confere.</p>';
+    h+='<p>Envie os prints da fatura ou cole o texto. Os prints são reduzidos e lidos um por vez; não ficam salvos no sistema. Confira os gastos antes de lançar. Compras com parcela tipo “2/6” são detectadas sozinhas.</p>';
     h+='<div class="imp-row"><div class="field"><label for="imp-conta">Esses gastos são do</label><select id="imp-conta">';
     cartoes.forEach(function(c){ h+='<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>'; });
     h+='</select></div></div>';
 
     if(imp.carregando){
-      h+='<div class="lendo"><div class="spin"></div>Lendo o texto…</div>';
+      h+='<div class="lendo"><div class="spin"></div>Lendo print '+(imp.progresso?imp.progresso.atual:1)+' de '+(imp.progresso?imp.progresso.total:1)+'…</div>';
     }else{
       if(imp.erro) h+='<div class="erro">'+esc(imp.erro)+'</div>';
       if(!imp.itens){
+        h+='<input type="file" id="imp-imagens" accept="image/jpeg,image/png,image/webp" multiple capture="environment" style="display:none">';
+        h+='<div class="rev-acoes"><button class="addbtn" data-act="selecionar-imagens">Enviar prints da fatura</button><span class="rev-info">Até 6 imagens · JPG, PNG ou WebP</span></div>';
         h+='<textarea id="imp-texto" placeholder="12/08  IFOOD  47,90  Alimentação&#10;13/08  AMAZON (2/6)  1.299,00"></textarea>';
         h+='<div class="rev-acoes"><button class="addbtn" data-act="ler-texto">Ler texto</button></div>';
       }
@@ -1911,6 +1971,11 @@
       if(!tx){ toast('Cole o texto dos gastos primeiro.'); return; }
       await processar(tx); return;
     }
+    if(act==='selecionar-imagens'){
+      var campoImagens=document.getElementById('imp-imagens');
+      if(campoImagens) campoImagens.click();
+      return;
+    }
     if(act==='cancelar-import'){ imp.itens=null; imp.erro=null; render(); return; }
     if(act==='confirmar-import'){
       var usar=imp.itens.filter(function(i){return i.usar&&i.valor>0;});
@@ -2021,7 +2086,14 @@
   });
 
   document.addEventListener('change',async function(ev){
-    var el=ev.target; if(!el.dataset) return;
+    var el=ev.target; if(!el.dataset&&el.id!=='imp-imagens') return;
+
+    if(el.id==='imp-imagens'){
+      var arquivos=Array.prototype.slice.call(el.files||[]);
+      el.value='';
+      if(!arquivos.length) return;
+      await processarImagens(arquivos); return;
+    }
 
     if(el.dataset.rev){
       var it=imp.itens&&imp.itens.filter(function(x){return x.tid===el.dataset.tid;})[0];
