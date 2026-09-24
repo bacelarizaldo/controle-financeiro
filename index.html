@@ -255,6 +255,8 @@
   #app .revisar select{border:1px solid var(--rule);background:#fff;border-radius:var(--radius-sm);padding:3px 5px;height:29px;font-size:13px;max-width:130px}
   .revisar .inline-val{width:96px}
   .rev-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:12px}
+  .rev-dup td{opacity:.55}
+  .rev-dup-tag{display:inline-block;margin:2px 4px 0;font-size:11.5px;color:var(--muted)}
   .rev-info{font-size:13px;color:var(--muted)}
 
   .catdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;position:relative;top:-1px}
@@ -720,6 +722,23 @@
   }
   function nomeSemParcela(desc){ return String(desc||'').replace(RX_PARCELA,'').trim(); }
 
+  // ---------- gastos repetidos ----------
+  // mesmo cartão + mesmo valor + mesma descrição (sem acento/caixa/pontuação).
+  // Parcelas comparam o número da parcela (a data pode variar entre fatura e
+  // parcela propagada); compras à vista comparam a data.
+  function chaveDesc(desc){
+    return nomeSemParcela(desc).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  }
+  function mesmoGasto(a,b){
+    if(a.conta!==b.conta) return false;
+    if(Math.abs((+a.valor||0)-(+b.valor||0))>=0.005) return false;
+    if(chaveDesc(a.descricao)!==chaveDesc(b.descricao)) return false;
+    var pa=detectaParcela(a.descricao), pb=detectaParcela(b.descricao);
+    if(pa||pb) return !!pa&&!!pb&&pa.atual===pb.atual&&pa.total===pb.total;
+    return (a.data||'')===(b.data||'');
+  }
+  function gastoRepetido(lista,g){ return lista.some(function(l){ return mesmoGasto(l,g); }); }
+
   function somaMesesData(d,n){
     var p=String(d||'').split('-'); if(p.length<3) return d;
     var y=+p[0], mo=+p[1]+n, dia=+p[2];
@@ -750,8 +769,7 @@
       id=proxId(id);
       var mm=await mesGarantido(id);
       var descNova=nomeBase+' ('+i+'/'+pc.total+')';
-      var jaExiste=mm.lancamentos.some(function(l){return l.conta===base.conta&&l.descricao===descNova&&Math.abs((+l.valor||0)-(+base.valor||0))<0.005;});
-      if(jaExiste) continue;
+      if(gastoRepetido(mm.lancamentos,{conta:base.conta,descricao:descNova,valor:base.valor})) continue;
       mm.lancamentos.push({
         id:uid(),
         data:somaMesesData(base.data,i-pc.atual),
@@ -833,6 +851,7 @@
       finally{ lista[i]=null; arquivo=null; }
     }
     imp.itens=normalizar(extraidos);
+    imp.itens.forEach(function(i){ if(itemJaLancado(i)) i.usar=false; });
     imp.carregando=false; imp.progresso=null;
     if(!imp.itens.length){
       imp.itens=null;
@@ -840,6 +859,10 @@
     }
     else if(falhas.length) imp.erro='Não consegui ler: '+falhas.join(', ')+'. Os demais lançamentos foram mantidos para revisão.';
     render();
+  }
+
+  function itemJaLancado(i){
+    return gastoRepetido(mes.lancamentos,{conta:imp.conta,data:i.data,descricao:i.descricao,valor:i.valor});
   }
 
   var TIPOS=[{id:'recorrente',rot:'Recorrente'},{id:'avulso',rot:'Avulso'},{id:'freela',rot:'Freela'}];
@@ -1541,13 +1564,14 @@
       }
     }
     if(imp.itens&&imp.itens.length){
-      var marcados=imp.itens.filter(function(i){return i.usar;});
+      var marcados=imp.itens.filter(function(i){return i.usar&&!itemJaLancado(i);});
       var somaM=marcados.reduce(function(a,i){return a+i.valor;},0);
       h+='<div class="revisar"><table><thead><tr><th style="width:30px"></th><th style="width:66px">Data</th><th>Descrição</th><th>Categoria</th><th class="c" style="width:72px">Parcela</th><th class="r">Valor</th></tr></thead><tbody>';
       imp.itens.forEach(function(i){
-        h+='<tr><td><input type="checkbox" data-rev="usar" data-tid="'+i.tid+'"'+(i.usar?' checked':'')+' aria-label="Incluir"></td>';
+        var dup=itemJaLancado(i);
+        h+='<tr'+(dup?' class="rev-dup"':'')+'><td><input type="checkbox" data-rev="usar" data-tid="'+i.tid+'"'+(i.usar&&!dup?' checked':'')+(dup?' disabled':'')+' aria-label="Incluir"></td>';
         h+='<td class="dim val">'+esc(dataCurta(i.data))+'</td>';
-        h+='<td><input data-rev="descricao" data-tid="'+i.tid+'" value="'+esc(i.descricao)+'" style="width:100%;border:1px solid transparent;background:transparent;padding:3px 4px;border-radius:2px"></td>';
+        h+='<td><input data-rev="descricao" data-tid="'+i.tid+'" value="'+esc(i.descricao)+'" style="width:100%;border:1px solid transparent;background:transparent;padding:3px 4px;border-radius:2px">'+(dup?'<span class="rev-dup-tag">Já lançado</span>':'')+'</td>';
         h+='<td><select data-rev="categoria" data-tid="'+i.tid+'">'+CATEGORIAS.map(function(c){return '<option'+(c===i.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></td>';
         h+='<td class="c"><input type="checkbox" data-rev="parcelado" data-tid="'+i.tid+'"'+(i.parcelado?' checked':'')+' aria-label="Parcelado"></td>';
         h+='<td class="r"><input class="inline-val" data-rev="valor" data-tid="'+i.tid+'" value="'+money(i.valor)+'"></td></tr>';
@@ -2000,6 +2024,7 @@
       var dataC=document.getElementById('nc-data').value||mesId+'-01';
       var catC=document.getElementById('nc-cat').value, contaC=document.getElementById('nc-conta').value;
       var pc=detectaParcela(descC);
+      if(gastoRepetido(mes.lancamentos,{conta:contaC,data:dataC,descricao:descC,valor:vlC})){ toast('Esse gasto já está lançado neste cartão.'); return; }
       mes.lancamentos.push({id:uid(),data:dataC,descricao:descC,categoria:catC,valor:vlC,conta:contaC,parcelado:!!pc});
       await salvar();
       if(pc) await propagarParcelas({data:dataC,categoria:catC,valor:vlC,conta:contaC,descricao:descC},pc);
@@ -2013,19 +2038,22 @@
     if(act==='cancelar-import'){ imp.itens=null; imp.erro=null; render(); return; }
     if(act==='confirmar-import'){
       var usar=imp.itens.filter(function(i){return i.usar&&i.valor>0;});
-      var paraPropagar=[];
-      usar.forEach(function(i){
+      var paraPropagar=[], repetidos=0;
+      usar=usar.filter(function(i){
+        // compara com o que já existe e com os itens anteriores deste mesmo lote
+        if(itemJaLancado(i)){ repetidos++; return false; }
         mes.lancamentos.push({id:uid(),data:i.data,descricao:i.descricao,categoria:i.categoria,valor:i.valor,conta:imp.conta,parcelado:!!i.parcelado});
         if(i.parcelado){
           var pc=detectaParcela(i.descricao);
           if(pc) paraPropagar.push({lanc:{data:i.data,descricao:i.descricao,categoria:i.categoria,valor:i.valor,conta:imp.conta},pc:pc});
         }
+        return true;
       });
       imp.itens=null; imp.erro=null;
       await salvar();
       for(var pi=0;pi<paraPropagar.length;pi++){ await propagarParcelas(paraPropagar[pi].lanc,paraPropagar[pi].pc); }
       render();
-      toast(usar.length+(usar.length===1?' gasto lançado':' gastos lançados')+' em '+nomeConta(imp.conta)+'.');
+      toast(usar.length+(usar.length===1?' gasto lançado':' gastos lançados')+' em '+nomeConta(imp.conta)+'.'+(repetidos?' '+repetidos+(repetidos===1?' repetido ignorado.':' repetidos ignorados.'):''));
       return;
     }
     if(act==='add-job'){
@@ -2172,7 +2200,7 @@
       if(el.dataset.rev==='valor') it.valor=Math.abs(parseNum(el.value));
       render(); return;
     }
-    if(el.id==='imp-conta'){ imp.conta=el.value; return; }
+    if(el.id==='imp-conta'){ imp.conta=el.value; if(imp.itens) render(); return; }
     if(el.id==='nvi-tipo'){ tipoNovoInvest=el.value; rentNovoInvest='pos'; render(); return; }
     if(el.id==='nvi-rent'){ rentNovoInvest=el.value; render(); return; }
 
