@@ -444,6 +444,18 @@
   .jobs-table th:nth-child(3),.jobs-table th:nth-child(4),.jobs-table th:nth-child(5){width:128px}
   .jobs-table th:nth-child(6){width:104px}.jobs-table th:nth-child(7){width:34px}
   #app .jobs-table .inline-val{width:112px;max-width:100%;padding-left:5px;padding-right:5px}
+  /* cor de cada job pelo tipo: recorrente azul, avulso rosa, freela âmbar */
+  .jobs-table tr.lin-recorrente td{background:#E8F0F6}
+  .jobs-table tr.lin-avulso td{background:#F7E8EE}
+  .jobs-table tr.lin-freela td{background:#FBF1D7}
+  .jobs-table tr.lin-recorrente td:first-child{box-shadow:inset 4px 0 0 var(--azul)}
+  .jobs-table tr.lin-avulso td:first-child{box-shadow:inset 4px 0 0 var(--rose)}
+  .jobs-table tr.lin-freela td:first-child{box-shadow:inset 4px 0 0 var(--amber)}
+  .jobs-table .tipo-tag{font-size:12px;font-weight:650}
+  .jobs-table .lin-recorrente .tipo-tag{color:var(--azul-esc)}
+  .jobs-table .lin-avulso .tipo-tag{color:var(--rose-esc)}
+  .jobs-table .lin-freela .tipo-tag{color:var(--amber)}
+  .jobs-table tr.grupo-jobs td{background:transparent;padding:10px 4px 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);box-shadow:none}
   .sec-recolhivel{padding:0;overflow:hidden}
   .sec-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:20px 24px;border:0;background:#fff;color:var(--ink);font:inherit;text-align:left}
   .sec-toggle:hover{background:#FAFAF8}.sec-toggle h2{margin:0;font-family:var(--sans);font-size:20px;font-weight:730;letter-spacing:-.04em}
@@ -980,11 +992,20 @@
       });
       h+='<div class="tabela-scroll"><table class="jobs-table"><thead><tr><th>Data</th><th>Cliente / job</th><th class="r">Orçamento</th><th class="r">Recebido</th><th class="r">Falta receber</th><th class="c">Situação</th><th></th></tr></thead><tbody>';
       var totOrc=0,totRec=0,totFal=0;
+      // recorrentes ficam fixos no topo; os demais vêm abaixo, separados
+      var temRec=lista.some(function(j){return tipoJob(j)==='recorrente';});
+      var temOutros=lista.some(function(j){return tipoJob(j)!=='recorrente';});
+      var grupoAtual=null;
       lista.forEach(function(j){
         var st=statusJob(j), ab=abertoJob(j);
+        var grupo=tipoJob(j)==='recorrente'?'rec':'outros';
+        if(temRec&&temOutros&&grupo!==grupoAtual){
+          grupoAtual=grupo;
+          h+='<tr class="grupo-jobs"><td colspan="7">'+(grupo==='rec'?'Recorrentes':'Avulsos e freelas')+'</td></tr>';
+        }
         totOrc+=(+j.valor||0); totRec+=recebidoJob(j); totFal+=ab;
         h+='<tr class="lin-'+tipoJob(j)+'"><td class="dim val">'+esc(dataCurta(j.data||j.mes+'-01'))+'</td>';
-        h+='<td><span class="nome">'+esc(j.cliente)+'</span><br><span class="dim">'+esc(rotTipo(tipoJob(j)))+'</span></td>';
+        h+='<td><span class="nome">'+esc(j.cliente)+'</span><br><span class="tipo-tag">'+esc(rotTipo(tipoJob(j)))+'</span></td>';
         h+='<td class="r"><input class="inline-val" style="font-weight:600" data-jedit="valor" data-id="'+j.id+'" value="'+money(j.valor)+'"></td>';
         h+='<td class="r"><div class="receb"><input class="inline-val" style="color:var(--green);font-weight:600" data-receb="'+j.id+'" value="'+(j.recebido?money(j.recebido):'')+'" placeholder="R$ 0,00" aria-label="Recebido de '+esc(j.cliente)+'">';
         h+='<button type="button" class="receb-ok" data-act="confirmar-receb" data-id="'+j.id+'" aria-label="Confirmar recebimento" title="Confirmar recebimento">✓</button></div></td>';
