@@ -221,6 +221,9 @@
   #app .inline-val{border:1px solid transparent;background:transparent;width:104px;text-align:right;padding:5px 8px;border-radius:var(--radius-sm);font-family:var(--serif);font-variant-numeric:tabular-nums;font-size:15px;transition:border-color .15s,box-shadow .15s}
   .inline-val:hover{border-color:var(--rule);background:#fff}
   .inline-val:focus{border-color:var(--ink);background:#fff;outline:none;box-shadow:var(--ring)}
+  .receb{display:inline-flex;align-items:center;gap:4px;justify-content:flex-end}
+  .receb-ok{border:1px solid var(--rule);background:transparent;color:var(--muted);width:30px;height:30px;border-radius:50%;font-size:14px;line-height:1;flex:none;transition:background .15s,color .15s,border-color .15s}
+  .receb-ok.pendente{background:var(--green);border-color:var(--green);color:#fff}
   .del{border:none;background:transparent;color:#AAB4B2;font-size:17px;line-height:1;padding:4px 6px;border-radius:var(--radius-sm);transition:color .15s,background .15s}
   .del:hover{color:var(--red);background:#F6E5E1}
 
@@ -983,7 +986,8 @@
         h+='<tr class="lin-'+tipoJob(j)+'"><td class="dim val">'+esc(dataCurta(j.data||j.mes+'-01'))+'</td>';
         h+='<td><span class="nome">'+esc(j.cliente)+'</span><br><span class="dim">'+esc(rotTipo(tipoJob(j)))+'</span></td>';
         h+='<td class="r"><input class="inline-val" style="font-weight:600" data-jedit="valor" data-id="'+j.id+'" value="'+money(j.valor)+'"></td>';
-        h+='<td class="r"><input class="inline-val" style="color:var(--green);font-weight:600" data-jedit="recebido" data-id="'+j.id+'" value="'+(j.recebido?money(j.recebido):'')+'" placeholder="R$ 0,00"></td>';
+        h+='<td class="r"><div class="receb"><input class="inline-val" style="color:var(--green);font-weight:600" data-receb="'+j.id+'" value="'+(j.recebido?money(j.recebido):'')+'" placeholder="R$ 0,00" aria-label="Recebido de '+esc(j.cliente)+'">';
+        h+='<button type="button" class="receb-ok" data-act="confirmar-receb" data-id="'+j.id+'" aria-label="Confirmar recebimento" title="Confirmar recebimento">✓</button></div></td>';
         h+='<td class="r val" style="color:var(--azul);font-weight:600">'+moneyExib(ab)+'</td>';
         h+='<td class="c"><span class="chip '+st.k+'">'+st.rot+'</span></td>';
         h+='<td class="r" style="width:34px"><button class="del" data-del="job" data-id="'+j.id+'" aria-label="Remover">×</button></td></tr>';
@@ -995,7 +999,7 @@
       h+='<td class="r val" style="font-weight:700;color:var(--azul)">'+moneyExib(totFal)+'</td>';
       h+='<td></td><td></td></tr></tfoot>';
       h+='</table></div>';
-      h+='<div class="sec-note">Preencha “Recebido” conforme o cliente for pagando — não precisa ser tudo de uma vez, o valor fica somado até completar o orçamento.</div>';
+      h+='<div class="sec-note">Digite o valor em “Recebido” e toque em ✓ para confirmar. Preencha conforme o cliente for pagando — não precisa ser tudo de uma vez, o valor fica somado até completar o orçamento.</div>';
     }
     h+='</section>';
     return h;
@@ -1952,6 +1956,28 @@
     toast('CSV de '+nomeMesCurto(mesId)+' baixado.');
   }
 
+  // o valor recebido só é gravado ao apertar ✓ (ou Enter) ao lado do campo
+  async function confirmarRecebido(id){
+    var jx=jobs.filter(function(x){return x.id===id;})[0];
+    var campo=document.querySelector('input[data-receb="'+id+'"]');
+    if(!jx||!campo) return;
+    var anterior=jx.recebido;
+    jx.recebido=Math.abs(parseNum(campo.value));
+    if(!await sset(KEY_JOBS,jobs)){ jx.recebido=anterior; return; }
+    render();
+    toast('Recebido de '+jx.cliente+' atualizado para '+money(jx.recebido)+'.');
+  }
+  document.addEventListener('keydown',function(ev){
+    var el=ev.target;
+    if(ev.key==='Enter'&&el&&el.dataset&&el.dataset.receb){ ev.preventDefault(); confirmarRecebido(el.dataset.receb); }
+  });
+  document.addEventListener('input',function(ev){
+    var el=ev.target; if(!el||!el.dataset||!el.dataset.receb) return;
+    var jx=jobs.filter(function(x){return x.id===el.dataset.receb;})[0];
+    var btn=el.parentNode.querySelector('.receb-ok');
+    if(jx&&btn) btn.classList.toggle('pendente',Math.abs(parseNum(el.value)-(+jx.recebido||0))>=0.005);
+  });
+
   document.addEventListener('click',async function(ev){
     var t=ev.target.closest&&ev.target.closest('button'); if(!t) return;
     var app=document.getElementById('app'); if(!app||!app.contains(t)) return;
@@ -1969,6 +1995,7 @@
       var f=mes.fixas.filter(function(x){return x.id===t.dataset.toggle;})[0];
       if(f){ f.pago=!f.pago; await salvar(); render(); } return;
     }
+    if(t.dataset.act==='confirmar-receb'){ await confirmarRecebido(t.dataset.id); return; }
     if(t.dataset.del==='job'){
       jobs=jobs.filter(function(x){return x.id!==t.dataset.id;});
       await sset(KEY_JOBS,jobs); render(); return;
@@ -2208,7 +2235,6 @@
       var jx=jobs.filter(function(x){return x.id===el.dataset.id;})[0];
       if(jx){
         if(el.dataset.jedit==='tipo') jx.tipo=el.value;
-        else if(el.dataset.jedit==='recebido') jx.recebido=Math.abs(parseNum(el.value));
         else jx.valor=Math.abs(parseNum(el.value));
         await sset(KEY_JOBS,jobs); render();
       }
