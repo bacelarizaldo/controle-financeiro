@@ -8,6 +8,13 @@ const crypto = require('crypto');
 const COOKIE = 'fin_session';
 const DIAS = 60;
 
+// Login desligado: o app abre direto, sem senha, para qualquer pessoa com o
+// link. Para voltar a exigir login, crie na Vercel a variável de ambiente
+// EXIGIR_LOGIN com o valor 1 e faça redeploy — nada no código precisa mudar.
+function loginObrigatorio() {
+  return process.env.EXIGIR_LOGIN === '1';
+}
+
 function segredo() {
   const s = process.env.SESSION_SECRET;
   if (!s) throw new Error('SESSION_SECRET não configurada nas variáveis de ambiente da Vercel.');
@@ -78,6 +85,7 @@ function autenticado(req) {
 }
 
 function exigirAuth(req, res) {
+  if (!loginObrigatorio()) return true;
   if (!autenticado(req)) {
     res.status(401).json({ error: 'Não autenticado.' });
     return false;
@@ -95,4 +103,4 @@ function cookieLogout() {
   return COOKIE + '=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/';
 }
 
-module.exports = { autenticado, exigirAuth, cookieLogin, cookieLogout, verificarLogin };
+module.exports = { autenticado, exigirAuth, loginObrigatorio, cookieLogin, cookieLogout, verificarLogin };

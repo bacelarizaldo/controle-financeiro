@@ -1894,9 +1894,12 @@
     var h='';
     h+='<button type="button" class="menu-overlay'+(menuAberto?' aberto':'')+'" data-act="fechar-menu" aria-label="Fechar menu"></button>';
     h+='<aside class="menu-lateral'+(menuAberto?' aberto':'')+'" aria-hidden="'+(!menuAberto)+'">';
+    // sem login (app aberto) não há conta nem botão Sair no menu
+    if(!(window.__loginLivre&&window.__loginLivre())){
     h+='<div class="menu-conta"><div class="menu-avatar">'+(nome?esc(nome.slice(0,1).toUpperCase()):'?')+'</div>';
     h+='<div class="menu-conta-nome">'+(nome?esc(nome):'Conta')+'</div>';
     h+='<button class="toolbtn" data-act="sair">Sair</button></div>';
+    }
     h+='<div class="menu-secao"><div class="menu-secao-titulo">Dados</div>';
     h+='<button class="menu-item" data-act="export">Baixar em CSV</button>';
     h+='<button class="menu-item" data-act="export-backup">Baixar backup completo</button>';
@@ -2425,7 +2428,7 @@
     document.getElementById('app').innerHTML='<div class="wrap"><p class="boot">Não consegui abrir o armazenamento. Recarregue a página para tentar de novo.</p></div>';
   }
 
-  var usuarioLogado=null;
+  var usuarioLogado=null, loginLivre=false;
 
   function telaLogin(msgErro){
     document.getElementById('app').innerHTML=
@@ -2483,13 +2486,14 @@
   });
   window.__sairApp=sair;
   window.__usuarioLogado=function(){ return usuarioLogado; };
+  window.__loginLivre=function(){ return loginLivre; };
   window.__onUnauthorized=function(){ telaLogin(); };
 
   (async function(){
     try{
       var resp=await fetch('/api/session');
       var data=await resp.json().catch(function(){ return {}; });
-      if(resp.ok){ usuarioLogado=data.usuario||null; await iniciar(false); }
+      if(resp.ok){ usuarioLogado=data.usuario||null; loginLivre=!!data.livre; await iniciar(false); }
       else telaLogin();
     }catch(e){ erroBoot(e); }
   })().catch(erroBoot);
