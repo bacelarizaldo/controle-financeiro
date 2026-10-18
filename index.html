@@ -641,7 +641,7 @@
   // só "não existe" (404) vira null; qualquer outro erro (rede, 500, sessão) sobe,
   // pra nunca confundir falha temporária com "sem dados" e sobrescrever o que já existe
   async function sget(k){ try{ var r=await window.storage.get(k); }catch(e){ if(e&&e.notFound) return null; throw e; } return r?JSON.parse(r.value):null; }
-  async function sset(k,v){ try{ var r=await window.storage.set(k,JSON.stringify(v)); return !!r; }catch(e){ toast('Não consegui salvar. Tente de novo.'); return false; } }
+  async function sset(k,v){ try{ var r=await window.storage.set(k,JSON.stringify(v)); if(!r) toast('Não consegui salvar. Tente de novo.'); return !!r; }catch(e){ toast('Não consegui salvar. Tente de novo.'); return false; } }
   async function slist(p){ var r=await window.storage.list(p); return (r&&r.keys)?r.keys:[]; }
 
   var cfg=null,mes=null,mesId=null,meses=[];
@@ -2460,6 +2460,8 @@
     }
     if(el.dataset.edit){
       var v=parseNum(el.value),id=el.dataset.id,tp=el.dataset.edit,alvo=null;
+      // pega a versão mais recente do mês (outro aparelho/aba pode ter mudado algo) antes de gravar
+      try{ var fresco=await sget(keyMes(mesId)); if(fresco) mes=fresco; }catch(e){}
       if(tp==='entrada') alvo=mes.entradas.filter(function(x){return x.id===id;})[0];
       if(tp==='fixa') alvo=mes.fixas.filter(function(x){return x.id===id;})[0];
       if(tp==='lanc') alvo=mes.lancamentos.filter(function(x){return x.id===id;})[0];
@@ -2482,7 +2484,7 @@
                 if(meses[mi]<=mesId) continue;
                 var mf=await sget(keyMes(meses[mi])); if(!mf) continue;
                 var alterou=false;
-                (mf[chave]||[]).forEach(function(x){ if(x.refId===alvo.refId&&!x.pago){ x.valor=v; alterou=true; } });
+                (mf[chave]||[]).forEach(function(x){ if(x.refId===alvo.refId){ x.valor=v; alterou=true; } });
                 if(alterou){ await sset(keyMes(meses[mi]),mf); mudou++; }
               }
               toast('Valor atualizado a partir de '+nomeMesCurto(mesId)+'.');
@@ -2557,6 +2559,29 @@
     chaves.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
     return true;
   }
+
+  var ultimoSync=0, sincronizando=false;
+  async function sincronizarDoServidor(){
+    if(sincronizando||!mesId||!cfg) return;
+    if(Date.now()-ultimoSync<4000) return;
+    var ativo=document.activeElement;
+    if(ativo&&/^(INPUT|SELECT|TEXTAREA)$/.test(ativo.tagName)) return;
+    if(document.querySelector('.escopo-ov')||imp.carregando||(imp.itens&&imp.itens.length)) return;
+    sincronizando=true;
+    try{
+      var c2=await sget(KEY_CFG), m2=await sget(keyMes(mesId)), j2=await sget(KEY_JOBS);
+      if(c2&&c2.versao===VERSAO) cfg=c2;
+      if(m2) mes=m2;
+      if(j2) jobs=j2;
+      meses=await carregarMeses();
+      ultimoSync=Date.now();
+      render();
+    }catch(e){}
+    finally{ sincronizando=false; }
+  }
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') sincronizarDoServidor(); });
+  window.addEventListener('focus',function(){ sincronizarDoServidor(); });
+  window.addEventListener('pageshow',function(e){ if(e.persisted) sincronizarDoServidor(); });
 
   async function iniciar(forcar){
     cfg=forcar?null:await sget(KEY_CFG);
