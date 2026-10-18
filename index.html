@@ -1231,23 +1231,23 @@
     var h='';
     h+='<div class="topbar"><div class="mesnav">';
     h+='<button class="arrow" data-nav="ant" '+(idx<=0?'disabled':'')+' aria-label="Mês anterior">‹</button>';
-    h+='<h1>Faturamento · '+esc(nomeMes(mesId))+'</h1>';
+    h+='<h1>IB Filmes · '+esc(nomeMesCurto(mesId))+'</h1>';
     h+='<button class="arrow" data-nav="prox" aria-label="Próximo mês">›</button>';
     h+='</div><div class="tools"><button class="toolbtn" data-act="export-jobs">Baixar em CSV</button></div></div>';
 
-    h+='<div class="hero hero-jobs">'+botaoOlho()+'<div class="hero-label">Faturado em '+esc(nomeMesCurto(mesId))+'</div>';
+    h+='<div class="hero hero-jobs">'+botaoOlho()+'<div class="hero-label">Faturamento da produtora em '+esc(nomeMesCurto(mesId))+'</div>';
     h+='<div class="hero-num">'+moneyExib(totMes)+'</div>';
-    h+='<div class="hero-sub">'+(doMes.length?(doMes.length+(doMes.length===1?' job fechado neste mês.':' jobs fechados neste mês.')):'Nenhum job lançado ainda neste mês.')+'</div>';
+    h+='<div class="hero-sub">'+(doMes.length?(doMes.length+(doMes.length===1?' job fechado neste mês.':' jobs fechados neste mês.')):'Nenhum job da IB Filmes lançado ainda neste mês.')+'</div>';
     h+='<div class="hero-grid">';
     h+='<div class="hero-cell"><span>Já recebido</span><b>'+moneyExib(recMes)+'</b></div>';
     h+='<div class="hero-cell"><span>Ainda a receber</span><b>'+moneyExib(abertoMes)+'</b></div>';
     h+='</div></div>';
 
-    h+='<section style="margin-top:28px"><div class="sec-head"><h2>Quando faturei mais em '+esc(ano)+'</h2><span class="sec-total">'+moneyExib(porMes.reduce(function(a,b){return a+b;},0))+'</span></div>';
+    h+='<section style="margin-top:28px"><div class="sec-head"><h2>Faturamento da IB Filmes em '+esc(ano)+'</h2><span class="sec-total">'+moneyExib(porMes.reduce(function(a,b){return a+b;},0))+'</span></div>';
     h+=barras(porMes, MESES.map(function(x){return x.slice(0,3);}), curIdx);
-    h+='<div class="sec-note">Cada barra é a soma dos orçamentos fechados naquele mês — o mês atual está destacado.</div></section>';
+    h+='<div class="sec-note">Cada barra é a soma dos jobs fechados naquele mês — o mês atual está destacado.</div></section>';
 
-    h+='<section><div class="sec-head"><h2>De onde vem o faturamento</h2><span class="sec-total">'+moneyExib(totMes)+'</span></div>';
+    h+='<section><div class="sec-head"><h2>Tipos de job</h2><span class="sec-total">'+moneyExib(totMes)+'</span></div>';
     if(totMes>0){
       h+='<div class="tipos">';
       TIPOS.forEach(function(t){
@@ -1260,7 +1260,7 @@
         h+='<div class="tipo-dim">'+pct+'% do mês · '+lista.length+(lista.length===1?' job':' jobs')+'</div></div>';
       });
       h+='</div>';
-      h+='<div class="sec-note">Recorrente é cliente que paga todo mês, avulso fecha um mês só e freela é trabalho pontual.</div>';
+      h+='<div class="sec-note">Recorrente é cliente de contrato mensal, avulso é um projeto fechado (vídeo, campanha, evento) e freela é diária ou trabalho pontual.</div>';
     }else{
       h+='<div class="vazio">Sem jobs lançados ainda neste mês.</div>';
     }
@@ -1272,7 +1272,7 @@
     h+='<div class="adder job-adder">';
     h+='<div class="job-l1">';
     h+=campoData('nj-data',dataJ);
-    h+='<div class="field"><label for="nj-cli">Descrição</label><input id="nj-cli" placeholder="Cliente / job"></div>';
+    h+='<div class="field"><label for="nj-cli">Descrição</label><input id="nj-cli" placeholder="Cliente · projeto"></div>';
     h+='<div class="field"><label for="nj-val">Valor<span class="nj-pormes"'+(recJ?'':' hidden')+'> por mês</span></label><input id="nj-val" class="w-val" placeholder="R$ 0,00"></div>';
     h+='</div><div class="job-l2">';
     h+='<input type="hidden" id="nj-tipo" value="'+esc(tipoNovoJob)+'">';
@@ -2154,7 +2154,7 @@
       var rotIB=mesId>='2026-09';
       h+='<tr><td><span class="nome'+(rotIB?' ib-filmes':'')+'">'+(rotIB?'IB FILMES':'Jobs de '+esc(nomeMesCurto(mesId)))+'</span><br><span class="dim">'+nj.length+(nj.length===1?' orçamento fechado':' orçamentos fechados')+'</span></td>';
       h+='<td class="r val">'+moneyExib(totJobsMes(mesId))+'</td>';
-      h+='<td class="r" style="width:34px"><button class="linkjob" data-vista="jobs" title="Ver no faturamento">ver</button></td></tr>';
+      h+='<td class="r" style="width:34px"><button class="linkjob" data-vista="jobs" title="Ver na IB Filmes">ver</button></td></tr>';
     }
     if(+m.repasse) h+='<tr><td class="nome">Sobra de '+esc(nomeMesCurto(antId(mesId)))+'</td><td class="r val">'+moneyExib(m.repasse)+'</td><td style="width:34px"></td></tr>';
     m.entradas.forEach(function(e){
@@ -2265,13 +2265,13 @@
     mes:'<path d="M4 7h16M4 12h16M4 17h10"/>',
     resumo:'<path d="M5 20V11M12 20V5M19 20v-7"/>',
     cartoes:'<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/>',
-    jobs:'<path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.4 4.5 3.1-2 3-4.5 3-4.5-1.3-4.5-3"/>',
+    jobs:'<rect x="3.5" y="9.5" width="17" height="10.5" rx="2"/><path d="M3.8 9.4 19.6 5.2l-.9-3.1L2.9 6.3l.9 3.1ZM8.2 3.2l2.3 4.6M13.4 1.9l2.3 4.6"/>',
     mais:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'
   };
   function iconeNav(k){ return '<svg viewBox="0 0 24 24" aria-hidden="true">'+ICONES_NAV[k]+'</svg>'; }
 
   function render(){
-    var ABAS=[['mes','Mês a mês'],['resumo','Resumo'],['jobs','Faturamento'],['cartoes','Cartões'],['financ','Financiamentos'],['invest','Investimentos']];
+    var ABAS=[['mes','Mês a mês'],['resumo','Resumo'],['jobs','IB Filmes'],['cartoes','Cartões'],['financ','Financiamentos'],['invest','Investimentos']];
     // topo (computador): marca + todas as abas + menu, numa barra fixa que não se sobrepõe
     var h='<header class="topo"><div class="topo-in">';
     h+='<div class="marca"><img src="/favicon.svg" alt="" width="26" height="26"><span>Finanças</span></div>';
@@ -2283,7 +2283,7 @@
     // barra de baixo (celular): 4 telas principais + "Mais"
     var emMais=(vista==='financ'||vista==='invest');
     h+='<nav class="nav-baixo" aria-label="Telas">';
-    [['mes','Mês'],['resumo','Resumo'],['cartoes','Cartões'],['jobs','Faturamento']].forEach(function(a){
+    [['mes','Mês'],['resumo','Resumo'],['cartoes','Cartões'],['jobs','IB Filmes']].forEach(function(a){
       h+='<button class="nb-item" data-vista="'+a[0]+'" aria-pressed="'+(vista===a[0])+'">'+iconeNav(a[0])+'<span>'+a[1]+'</span></button>';
     });
     h+='<button class="nb-item" data-act="toggle-menu" aria-pressed="'+(emMais||menuAberto)+'">'+iconeNav('mais')+'<span>'+(vista==='financ'?'Financ.':(vista==='invest'?'Invest.':'Mais'))+'</span></button>';
@@ -2358,8 +2358,8 @@
     var csv='\ufeff'+L.map(function(l){return l.map(celulaCSV).join(';');}).join('\r\n');
     var a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-    a.download='faturamento-'+mesId+'.csv'; a.click();
-    toast('Faturamento de '+nomeMesCurto(mesId)+' baixado.');
+    a.download='ib-filmes-'+mesId+'.csv'; a.click();
+    toast('Jobs da IB Filmes de '+nomeMesCurto(mesId)+' baixados.');
   }
 
   async function exportarBackup(){
