@@ -469,6 +469,21 @@
   .pix-rapido{background:linear-gradient(135deg,#F0F5E8,#FFFFFF);border-color:#DEE8CF}.pix-rapido .sec-head{margin-bottom:8px}.pix-rapido .sec-head h2:before{content:'↗';display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#A9CE46;color:#173000;font-size:16px;vertical-align:1px}.pix-rapido .adder{background:rgba(255,255,255,.76)}
   .rev-parc{display:block;margin-top:3px;font-size:11px;font-weight:700;color:var(--violeta-esc)}
   .rev-total{display:block;margin-top:3px;font-size:11px;color:var(--muted);white-space:nowrap}
+  /* Resumo: categorias clicáveis */
+  .cat-btn{border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;transition:filter .15s,transform .15s}
+  .cat-btn:hover{filter:brightness(.96)}
+  .cat-btn:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+  .cat-chev{display:inline-block;margin-left:2px;font-size:15px;line-height:1;transition:transform .2s;opacity:.7}
+  .cat-btn[aria-expanded="true"] .cat-chev{transform:rotate(90deg)}
+  .cat-detalhe td{padding-top:0!important}
+  .cat-lista{border-left:3px solid;margin:2px 0 10px 6px;padding:4px 0 4px 14px}
+  .cat-lista-cab{font-size:12px;color:var(--muted);margin:2px 0 6px}
+  .cat-item{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--rule-soft);font-size:13.5px}
+  .cat-item:last-child{border-bottom:0}
+  .cat-item-data{color:var(--muted);font-size:12.5px}
+  .cat-item-desc{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .cat-item-desc small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+  .cat-item-val{font-weight:600;white-space:nowrap}
   /* Registrar gasto via Pix: valor compacto, data como ícone de calendário */
   .pix-rapido .pix-adder{display:grid;grid-template-columns:112px minmax(0,1fr) minmax(0,190px) auto auto;grid-template-areas:"val desc cat cal btn";align-items:end;gap:10px}
   .pix-adder .field{min-width:0}
@@ -616,6 +631,7 @@
   var cardsAbertos={};
   var secoesMesAbertas={};
   var menuAberto=false;
+  var catResumoAberta=null; // categoria expandida no Resumo
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
   var investimentos=[], mercado={cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
   var KEY_INVEST='fin:investimentos', KEY_MERCADO='fin:mercado_cache';
@@ -1739,6 +1755,21 @@
     return mapa;
   }
 
+  // todos os gastos do mês numa categoria: contas fixas + cartões + Pix/dinheiro, do maior para o menor
+  function gastosDaCategoria(m,cat){
+    var lista=[];
+    m.fixas.forEach(function(f){
+      if(f.categoria!==cat||!(+f.valor)) return;
+      lista.push({data:'dia '+String(f.dia||'').padStart(2,'0'),desc:f.nome,origem:'Conta fixa'+(f.pago?' · paga':''),valor:+f.valor||0});
+    });
+    m.lancamentos.forEach(function(l){
+      if(l.categoria!==cat||!(+l.valor)) return;
+      var tp=tipoConta(l.conta);
+      lista.push({data:dataCurta(l.data),desc:l.descricao,origem:(tp==='cartao'?'Cartão '+nomeConta(l.conta):nomeConta(l.conta))+(l.parcelado?' · parcelado':''),valor:+l.valor||0});
+    });
+    return lista.sort(function(a,b){return b.valor-a.valor;});
+  }
+
   function viewResumo(){
     var m=mes, idx=meses.indexOf(mesId);
     var ent=totEntradas(m), des=totDespesas(m), sob=sobra(m), falta=faltaPagar(m);
@@ -1774,7 +1805,16 @@
       h+='<table style="margin-top:10px"><tbody>';
       catsOrdenadas.forEach(function(c){
         var pct=des?Math.round(mapaCat[c]/des*100):0;
-        h+='<tr><td><span class="catsel" style="background:'+corCatSuave(c)+';color:'+corCat(c)+';font-weight:600;font-size:13px"><span class="catdot" style="background:'+corCat(c)+'"></span>'+esc(c)+'</span></td><td class="r dim">'+pct+'%</td><td class="r val" style="color:'+corCat(c)+';font-weight:600">'+moneyExib(mapaCat[c])+'</td></tr>';
+        var aberta=catResumoAberta===c, itensCat=aberta?gastosDaCategoria(m,c):[];
+        h+='<tr class="cat-linha'+(aberta?' aberta':'')+'"><td><button type="button" class="catsel cat-btn" data-act="resumo-cat" data-cat="'+esc(c)+'" aria-expanded="'+aberta+'" style="background:'+corCatSuave(c)+';color:'+corCat(c)+';font-weight:600;font-size:13px"><span class="catdot" style="background:'+corCat(c)+'"></span>'+esc(c)+'<span class="cat-chev" aria-hidden="true">›</span></button></td><td class="r dim">'+pct+'%</td><td class="r val" style="color:'+corCat(c)+';font-weight:600">'+moneyExib(mapaCat[c])+'</td></tr>';
+        if(aberta){
+          h+='<tr class="cat-detalhe"><td colspan="3"><div class="cat-lista" style="border-color:'+corCat(c)+'">';
+          h+='<div class="cat-lista-cab">'+itensCat.length+(itensCat.length===1?' gasto':' gastos')+' em '+esc(c)+'</div>';
+          itensCat.forEach(function(g){
+            h+='<div class="cat-item"><span class="cat-item-data val">'+esc(g.data)+'</span><span class="cat-item-desc">'+esc(g.desc)+'<small>'+esc(g.origem)+'</small></span><span class="cat-item-val val">'+moneyExib(g.valor)+'</span></div>';
+          });
+          h+='</div></td></tr>';
+        }
       });
       h+='</tbody></table>';
     }else{
@@ -2085,6 +2125,7 @@
     if(t.dataset.toggleSecao){ var ks=t.dataset.toggleSecao; secoesMesAbertas[ks]=!secoesMesAbertas[ks]; render(); return; }
     if(t.dataset.act==='toggle-menu'){ menuAberto=!menuAberto; render(); return; }
     if(t.dataset.act==='toggle-valores'){ valoresOcultos=!valoresOcultos; render(); return; }
+    if(t.dataset.act==='resumo-cat'){ var cr=t.dataset.cat; catResumoAberta=(catResumoAberta===cr)?null:cr; render(); return; }
     if(t.dataset.act==='fechar-menu'){ menuAberto=false; render(); return; }
     if(t.dataset.vista){ vista=t.dataset.vista; render(); window.scrollTo({top:0}); return; }
     if(t.dataset.ftipo){ filtroTipo=t.dataset.ftipo; render(); return; }
