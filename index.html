@@ -500,7 +500,8 @@
   .job-l1 .field input{width:100%}
   #app .job-l1 .w-val{width:100%;text-align:left}
   .job-l2{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-  .job-l2 .addbtn{margin-left:auto}
+  .job-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:39px;padding:0 20px}
+  .job-add svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
   .job-l2 select{min-width:130px}
   .seg{display:inline-flex;gap:3px;padding:3px;border-radius:999px;background:var(--campo);border:1px solid var(--campo-borda)}
   .seg-btn{border:0;background:transparent;color:var(--muted);font-weight:620;font-size:13px;padding:0 13px;height:31px;border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap}
@@ -512,6 +513,7 @@
   @media(max-width:620px){
     .job-l1{grid-template-columns:auto minmax(0,1fr) 108px;gap:8px}
     .job-l2 .field:first-child{flex:1 1 100%}
+    .job-l2 .job-add{flex:1 1 100%;height:46px;font-size:15px;margin-top:2px}
     .seg{display:flex}
     .seg-btn{flex:1}
     .job-l2 .nj-ate-campo{flex:1 1 auto}
@@ -1279,7 +1281,7 @@
       h+='<button type="button" class="seg-btn t-'+t[0]+'" data-act="nj-tipo" data-tipo="'+t[0]+'" aria-pressed="'+(tipoNovoJob===t[0])+'">'+t[1]+'</button>';
     });
     h+='</div></div>';
-    h+='<button class="addbtn" data-act="add-job">Adicionar</button>';
+    h+='<button class="addbtn job-add" data-act="add-job"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Adicionar job</button>';
     h+='</div></div>';
 
     if(doMes.length){
