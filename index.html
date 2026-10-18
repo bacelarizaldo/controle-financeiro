@@ -1279,7 +1279,6 @@
       h+='<button type="button" class="seg-btn t-'+t[0]+'" data-act="nj-tipo" data-tipo="'+t[0]+'" aria-pressed="'+(tipoNovoJob===t[0])+'">'+t[1]+'</button>';
     });
     h+='</div></div>';
-    h+='<div class="field nj-ate-campo"'+(recJ?'':' hidden')+'><label for="nj-ate">Repete até</label><select id="nj-ate">'+mm.map(function(id,i){return '<option value="'+id+'"'+(i===11?' selected':'')+'>'+MESES[i]+'</option>';}).join('')+'</select></div>';
     h+='<button class="addbtn" data-act="add-job">Adicionar</button>';
     h+='</div></div>';
 
@@ -2442,7 +2441,6 @@
       form.querySelectorAll('.seg-btn').forEach(function(b){ b.setAttribute('aria-pressed',String(b===t)); });
       document.getElementById('nj-tipo').value=tipoNovoJob;
       var rec=tipoNovoJob==='recorrente';
-      form.querySelector('.nj-ate-campo').hidden=!rec;
       form.querySelector('.nj-pormes').hidden=!rec;
       return;
     }
@@ -2559,9 +2557,9 @@
       var vj=parseNum(document.getElementById('nj-val').value);
       var dj=document.getElementById('nj-data').value||mesId+'-01';
       var tj=document.getElementById('nj-tipo').value;
-      var aj=document.getElementById('nj-ate').value;
       if(!cli||!vj){ toast('Preencha o cliente e o valor.'); return; }
       var mj=dj.slice(0,7), dia=dj.slice(8,10);
+      var aj=mj.slice(0,4)+'-12'; // recorrente: lança deste mês até dezembro
       if(tj==='recorrente'&&aj>mj){
         var grupo=uid(), cur=mj, n=0;
         while(cur<=aj&&n<12){
