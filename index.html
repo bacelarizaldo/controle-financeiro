@@ -461,6 +461,27 @@
   .sec-toggle:hover{background:#FAFAF8}.sec-toggle h2{margin:0;font-family:var(--sans);font-size:20px;font-weight:730;letter-spacing:-.04em}
   .sec-toggle-info{display:flex;align-items:center;gap:12px}.sec-toggle .chev{font-size:20px}.sec-recolhivel-conteudo{padding:0 24px 21px}
   .pix-rapido{background:linear-gradient(135deg,#F0F5E8,#FFFFFF);border-color:#DEE8CF}.pix-rapido .sec-head{margin-bottom:8px}.pix-rapido .sec-head h2:before{content:'↗';display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#A9CE46;color:#173000;font-size:16px;vertical-align:1px}.pix-rapido .adder{background:rgba(255,255,255,.76)}
+  /* Registrar gasto via Pix: valor compacto, data como ícone de calendário */
+  .pix-rapido .pix-adder{display:grid;grid-template-columns:112px minmax(0,1fr) minmax(0,190px) auto auto;grid-template-areas:"val desc cat cal btn";align-items:end;gap:10px}
+  .pix-adder .field{min-width:0}
+  .pix-adder .pq-val{grid-area:val}.pix-adder .pq-desc{grid-area:desc}.pix-adder .pq-cat{grid-area:cat}.pix-adder .pix-cal{grid-area:cal}.pix-adder .pq-btn{grid-area:btn}
+  #app .pix-adder .w-val,.pix-adder .field input,.pix-adder .field select{width:100%}
+  .pix-cal{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:39px;height:39px;padding:0 9px;border:1px solid #E1E2DD;border-radius:11px;background:#fff;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
+  .pix-cal:hover{border-color:#A9CE46}
+  .pix-cal svg{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+  .pix-cal-rot{font-size:12.5px;font-weight:640;font-variant-numeric:tabular-nums}
+  .pix-cal-rot:empty{display:none}
+  .pix-cal.alterada{background:#F0F5E8;border-color:#A9CE46;color:#2D4A00}
+  .pix-cal input[type=date]{position:absolute;inset:0;width:100%;height:100%;max-width:none;opacity:0;cursor:pointer;border:0;padding:0;margin:0}
+  .pix-cal input[type=date]::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+  .pix-cal:focus-within{outline:2px solid #A9CE46;outline-offset:2px}
+  .pix-adder .pq-btn,.pix-cal{white-space:nowrap;min-width:max-content}
+  @media(max-width:620px){
+    .pix-rapido .pix-adder{grid-template-columns:104px minmax(0,1fr) max-content max-content;grid-template-areas:"val desc desc desc" "cat cat cal btn";gap:8px}
+    .pix-adder .pq-btn{padding:0 14px}
+    .pix-cal{padding:0 8px;gap:4px}
+    .pq-btn-extra{display:none}
+  }
   @media(max-width:620px){.sec-toggle{padding:17px 16px}.sec-toggle h2{font-size:18px}.sec-recolhivel-conteudo{padding:0 16px 17px}.pix-rapido .sec-head h2{font-size:18px}}
   .hero-olho{position:absolute;top:14px;right:14px;z-index:3;display:grid;place-items:center;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:var(--paper);transition:background .15s}
   .hero-olho:hover,.hero-olho:focus-visible{background:rgba(255,255,255,.26);outline:none}
@@ -687,9 +708,16 @@
     if(mesId>hojeId()) return 'apagar';
     return f.dia<new Date().getDate()?'vencido':'apagar';
   }
+  function dataHojeISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function dataPadrao(){
-    if(mesId===hojeId()){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    if(mesId===hojeId()) return dataHojeISO();
     return mesId+'-01';
+  }
+  // rótulo do ícone de calendário do Pix: vazio quando é hoje, "dd/mm" quando a data foi trocada
+  function rotuloDataPix(iso,longo){
+    if(!iso) return longo?'hoje':'';
+    if(iso===dataHojeISO()) return longo?'hoje':'';
+    var p=iso.split('-'); return p[2]+'/'+p[1]+(longo?'/'+p[0]:'');
   }
 
   // ---------- leitura de fatura por imagem ----------
@@ -1759,12 +1787,17 @@
     // lançamento rápido: sempre via Pix e visível logo após o saldo
     h+='<section class="pix-rapido"><div class="sec-head"><h2>Registrar gasto via Pix</h2></div>';
     h+='<div class="sec-note">Adicione um gasto sem procurar pelo fim da página. Ele será salvo como Pix.</div>';
-    h+='<div class="adder">';
-    h+='<div class="field"><label for="nq-val">Valor</label><input id="nq-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
-    h+='<div class="field" style="flex:1 1 210px"><label for="nq-desc">Descrição</label><input id="nq-desc" style="width:100%" placeholder="Mercado, combustível…"></div>';
-    h+='<div class="field"><label for="nq-data">Data</label><input id="nq-data" type="date" value="'+esc(dataPadrao())+'"></div>';
-    h+='<div class="field" style="flex:1 1 170px"><label for="nq-cat">Categoria</label><select id="nq-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
-    h+='<button class="addbtn" data-act="add-lanc-rapido">Adicionar gasto</button></div></section>';
+    // valor compacto; data fica no dia de hoje por padrão e só aparece como ícone de calendário
+    var dataQ=dataPadrao();
+    h+='<div class="adder pix-adder">';
+    h+='<div class="field pq-val"><label for="nq-val">Valor</label><input id="nq-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
+    h+='<div class="field pq-desc"><label for="nq-desc">Descrição</label><input id="nq-desc" placeholder="Mercado, combustível…"></div>';
+    h+='<div class="field pq-cat"><label for="nq-cat">Categoria</label><select id="nq-cat">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
+    h+='<div class="pix-cal'+(dataQ===dataHojeISO()?'':' alterada')+'" title="Data do gasto: '+esc(rotuloDataPix(dataQ,true))+'">'+
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'+
+      '<span class="pix-cal-rot">'+esc(rotuloDataPix(dataQ,false))+'</span>'+
+      '<input id="nq-data" type="date" value="'+esc(dataQ)+'" aria-label="Data do gasto (padrão: hoje)"></div>';
+    h+='<button class="addbtn pq-btn" data-act="add-lanc-rapido">Adicionar<span class="pq-btn-extra"> gasto</span></button></div></section>';
 
     // entradas
     var entradasAbertas=secaoMesAberta('entradas');
@@ -2228,8 +2261,23 @@
     await processarImagens(imagens);
   });
 
+  // ícone de calendário do Pix: no computador abre o seletor de data ao clicar em qualquer parte do ícone
+  document.addEventListener('click',function(ev){
+    var el=ev.target; if(!el||el.id!=='nq-data') return;
+    try{ if(el.showPicker) el.showPicker(); }catch(e){}
+  });
+
   document.addEventListener('change',async function(ev){
     var el=ev.target; if(!el.dataset&&el.id!=='imp-imagens') return;
+
+    if(el.id==='nq-data'){
+      var wrap=el.closest('.pix-cal'); if(!wrap) return;
+      if(!el.value) el.value=dataPadrao();
+      wrap.querySelector('.pix-cal-rot').textContent=rotuloDataPix(el.value,false);
+      wrap.classList.toggle('alterada',el.value!==dataHojeISO());
+      wrap.title='Data do gasto: '+rotuloDataPix(el.value,true);
+      return;
+    }
 
     if(el.id==='imp-imagens'){
       var arquivos=Array.prototype.slice.call(el.files||[]);
