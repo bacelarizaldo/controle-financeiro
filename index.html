@@ -494,6 +494,29 @@
   .escopo-btn.sec{background:#F1F2EE;color:var(--ink)}
   .escopo-btn:focus-visible{outline:2px solid #A9CE46;outline-offset:2px}
   @keyframes escopoIn{from{opacity:0}to{opacity:1}}
+  /* ===== novo job (estilo Pix) ===== */
+  .job-adder{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+  .job-l1{display:grid;grid-template-columns:auto minmax(0,1fr) 140px;gap:10px;align-items:end}
+  .job-l1 .field input{width:100%}
+  #app .job-l1 .w-val{width:100%;text-align:left}
+  .job-l2{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .job-l2 .addbtn{margin-left:auto}
+  .job-l2 select{min-width:130px}
+  .seg{display:inline-flex;gap:3px;padding:3px;border-radius:999px;background:var(--campo);border:1px solid var(--campo-borda)}
+  .seg-btn{border:0;background:transparent;color:var(--muted);font-weight:620;font-size:13px;padding:0 13px;height:31px;border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .seg-btn[aria-pressed="true"]{color:#0E1112}
+  .seg-btn.t-recorrente[aria-pressed="true"]{background:#7FA8E8}
+  .seg-btn.t-avulso[aria-pressed="true"]{background:#E68BAE}
+  .seg-btn.t-freela[aria-pressed="true"]{background:#E2B85A}
+  [hidden]{display:none!important}
+  @media(max-width:620px){
+    .job-l1{grid-template-columns:auto minmax(0,1fr) 108px;gap:8px}
+    .job-l2 .field:first-child{flex:1 1 100%}
+    .seg{display:flex}
+    .seg-btn{flex:1}
+    .job-l2 .nj-ate-campo{flex:1 1 auto}
+    .job-l2 .nj-ate-campo select{width:100%}
+  }
   /* ===== navegação: topo (computador) e barra de baixo (celular) ===== */
   .hamburger{display:none!important}
   .topo{position:sticky;top:0;z-index:35;background:rgba(14,17,18,.86);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid #1F2526}
@@ -801,6 +824,7 @@
   var secoesMesAbertas={};
   var menuAberto=false;
   var catResumoAberta=null; // categoria expandida no Resumo
+  var tipoNovoJob='recorrente';
   var KEY_JOBS='fin:jobs', KEY_FIN='fin:financiamentos';
   var investimentos=[], mercado={cdi:[],selic:[],acoes:{},tesouro:[],atualizadoEm:null}, tipoNovoInvest='cdi', rentNovoInvest='pos', atualizandoMercado=false;
   var KEY_INVEST='fin:investimentos', KEY_MERCADO='fin:mercado_cache';
@@ -906,6 +930,12 @@
   function dataPadrao(){
     if(mesId===hojeId()) return dataHojeISO();
     return mesId+'-01';
+  }
+  function campoData(id,valor){
+    return '<div class="pix-cal'+(valor===dataHojeISO()?'':' alterada')+'" title="Data: '+esc(rotuloDataPix(valor,true))+'">'+
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'+
+      '<span class="pix-cal-rot">'+esc(rotuloDataPix(valor,false))+'</span>'+
+      '<input id="'+id+'" type="date" value="'+esc(valor)+'" aria-label="Data (padrão: hoje)"></div>';
   }
   // rótulo do ícone de calendário do Pix: vazio quando é hoje, "dd/mm" quando a data foi trocada
   function rotuloDataPix(iso,longo){
@@ -1235,13 +1265,23 @@
     h+='</section>';
 
     h+='<section><div class="sec-head"><h2>Jobs de '+esc(nomeMesCurto(mesId))+'</h2><span class="sec-total">'+moneyExib(abertoMes)+' em aberto</span></div>';
-    h+='<div class="adder">';
-    h+='<div class="field"><label for="nj-data">Data</label><input id="nj-data" type="date" value="'+esc(dataPadrao())+'"></div>';
-    h+='<div class="field"><label for="nj-cli">Cliente / job</label><input id="nj-cli" style="width:170px" placeholder="Nome do cliente"></div>';
-    h+='<div class="field"><label for="nj-tipo">Tipo</label><select id="nj-tipo">'+TIPOS.map(function(t){return '<option value="'+t.id+'">'+t.rot+'</option>';}).join('')+'</select></div>';
-    h+='<div class="field"><label for="nj-val">Valor por mês</label><input id="nj-val" class="w-val" placeholder="R$ 0,00"></div>';
-    h+='<div class="field"><label for="nj-ate">Recorrente repete até</label><select id="nj-ate">'+mm.map(function(id,i){return '<option value="'+id+'"'+(i===11?' selected':'')+'>'+MESES[i]+'</option>';}).join('')+'</select></div>';
-    h+='<button class="addbtn" data-act="add-job">Adicionar job</button></div>';
+    // novo job no estilo do Pix: data (ícone), descrição e valor; o tipo vem por último
+    var dataJ=dataPadrao(), recJ=tipoNovoJob==='recorrente';
+    h+='<div class="adder job-adder">';
+    h+='<div class="job-l1">';
+    h+=campoData('nj-data',dataJ);
+    h+='<div class="field"><label for="nj-cli">Descrição</label><input id="nj-cli" placeholder="Cliente / job"></div>';
+    h+='<div class="field"><label for="nj-val">Valor<span class="nj-pormes"'+(recJ?'':' hidden')+'> por mês</span></label><input id="nj-val" class="w-val" placeholder="R$ 0,00"></div>';
+    h+='</div><div class="job-l2">';
+    h+='<input type="hidden" id="nj-tipo" value="'+esc(tipoNovoJob)+'">';
+    h+='<div class="field"><label>Tipo</label><div class="seg" role="group" aria-label="Tipo do job">';
+    [['avulso','Avulso'],['recorrente','Recorrente'],['freela','Freela']].forEach(function(t){
+      h+='<button type="button" class="seg-btn t-'+t[0]+'" data-act="nj-tipo" data-tipo="'+t[0]+'" aria-pressed="'+(tipoNovoJob===t[0])+'">'+t[1]+'</button>';
+    });
+    h+='</div></div>';
+    h+='<div class="field nj-ate-campo"'+(recJ?'':' hidden')+'><label for="nj-ate">Repete até</label><select id="nj-ate">'+mm.map(function(id,i){return '<option value="'+id+'"'+(i===11?' selected':'')+'>'+MESES[i]+'</option>';}).join('')+'</select></div>';
+    h+='<button class="addbtn" data-act="add-job">Adicionar</button>';
+    h+='</div></div>';
 
     if(doMes.length){
       h+='<div class="filtros"><button class="fchip" data-ftipo="todos" aria-pressed="'+(filtroTipo==='todos')+'">Todos</button>';
@@ -2396,6 +2436,16 @@
     if(t.dataset.toggleSecao){ var ks=t.dataset.toggleSecao; secoesMesAbertas[ks]=!secoesMesAbertas[ks]; render(); return; }
     if(t.dataset.act==='toggle-menu'){ menuAberto=!menuAberto; render(); return; }
     if(t.dataset.act==='toggle-valores'){ valoresOcultos=!valoresOcultos; render(); return; }
+    if(t.dataset.act==='nj-tipo'){
+      tipoNovoJob=t.dataset.tipo;
+      var form=t.closest('.job-adder');
+      form.querySelectorAll('.seg-btn').forEach(function(b){ b.setAttribute('aria-pressed',String(b===t)); });
+      document.getElementById('nj-tipo').value=tipoNovoJob;
+      var rec=tipoNovoJob==='recorrente';
+      form.querySelector('.nj-ate-campo').hidden=!rec;
+      form.querySelector('.nj-pormes').hidden=!rec;
+      return;
+    }
     if(t.dataset.act==='resumo-cat'){ var cr=t.dataset.cat; catResumoAberta=(catResumoAberta===cr)?null:cr; render(); return; }
     if(t.dataset.act==='fechar-menu'){ menuAberto=false; render(); return; }
     if(t.dataset.vista){ vista=t.dataset.vista; menuAberto=false; render(); window.scrollTo({top:0}); return; }
@@ -2630,14 +2680,14 @@
 
   // ícone de calendário do Pix: no computador abre o seletor de data ao clicar em qualquer parte do ícone
   document.addEventListener('click',function(ev){
-    var el=ev.target; if(!el||el.id!=='nq-data') return;
+    var el=ev.target; if(!el||!el.closest||!el.closest('.pix-cal')||el.type!=='date') return;
     try{ if(el.showPicker) el.showPicker(); }catch(e){}
   });
 
   document.addEventListener('change',async function(ev){
     var el=ev.target; if(!el.dataset&&el.id!=='imp-imagens') return;
 
-    if(el.id==='nq-data'){
+    if(el.type==='date'&&el.closest&&el.closest('.pix-cal')){
       var wrap=el.closest('.pix-cal'); if(!wrap) return;
       if(!el.value) el.value=dataPadrao();
       wrap.querySelector('.pix-cal-rot').textContent=rotuloDataPix(el.value,false);
