@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Controle financeiro 2026</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Finanças">
-<meta name="theme-color" content="#F2F3EE">
-<style>html,body{margin:0;padding:0;background:#F2F3EE;padding-top:env(safe-area-inset-top,0px)}</style>
+<meta name="theme-color" content="#0E1112">
+<style>html,body{margin:0;padding:0;background:#0E1112;padding-top:env(safe-area-inset-top,0px)}</style>
 </head>
 <body>
 <div id="app">
@@ -537,6 +537,105 @@
   .hero-olho[aria-pressed="true"]{background:rgba(255,255,255,.28)}
   .hero .hero-label{padding-right:48px}
 </style>
+<style id="tema-escuro">
+  /* ===== Tema escuro (app todo) ===== */
+  :root{
+    color-scheme:dark;
+    --paper:#0E1112; --card:#171B1C; --ink:#ECEEEA; --muted:#9AA3A1;
+    --rule:#2E3536; --rule-soft:#252B2C;
+    --green:#9BC75A; --green-esc:#B9DB6A; --red:#F08A78; --amber:#E2B85A;
+    --azul:#7FA8E8; --azul-esc:#A9C4F0; --violeta:#B596E6; --violeta-esc:#CDB6F2;
+    --indigo:#8FA6DE; --indigo-esc:#B4C3EC; --rose:#E08AAB; --rose-esc:#EDB0C6;
+    --ambron:#E2B85A; --ambron-esc:#EBC97E;
+    --shadow-sm:none; --shadow-md:0 10px 30px rgba(0,0,0,.35); --ring:0 0 0 3px rgba(169,206,70,.22);
+    --campo:#22282A; --campo-borda:#343B3C; --elevado:#1E2324; --lima:#A9CE46; --lima-texto:#142000;
+  }
+  html,body,#app{background:var(--paper)}
+  #app{color:var(--ink)}
+  section{background:var(--card);box-shadow:none;border:1px solid #1F2526}
+  td{background:var(--elevado)}
+  .linha-total td{background:#1F2A1B}
+  .adder,.import,.conta-bloco,.tipo-bloco{background:var(--elevado)}
+  .field input,.field select,textarea,#app .revisar select,.pix-cal{background:var(--campo);border-color:var(--campo-borda);color:var(--ink)}
+  #app input::placeholder,#app textarea::placeholder{color:#6F7877}
+  .inline-val:hover,.inline-val:focus{background:var(--campo);border-color:var(--campo-borda)}
+  #app .inline-val[data-edit],#app .inline-val[data-jedit],#app .inline-val[data-receb]{background-color:var(--campo);border-color:var(--campo-borda);color:var(--ink)}
+  #app .inline-val[data-edit]:hover,#app .inline-val[data-jedit]:hover,#app .inline-val[data-receb]:hover,
+  #app .inline-val[data-edit]:focus,#app .inline-val[data-jedit]:focus,#app .inline-val[data-receb]:focus{background-color:#2A3132;border-color:#4A5354}
+  #app select.mini:hover{background:var(--campo)}
+  /* hero e cartões */
+  .hero{background:#161B1C;border:1px solid #232A2B}
+  .hero,.hero-num,.hero-cell b{color:#F4F6EF}
+  .hero.hero-jobs{background:linear-gradient(135deg,#141819,#1F2740)}
+  .hero.hero-cartoes{background:linear-gradient(135deg,#141819,#3A2029)}
+  .hero.hero-financ{background:linear-gradient(135deg,#141819,#3B2E12)}
+  .hero.hero-invest,.hero.hero-resumo{background:linear-gradient(135deg,#141819,#1F3016)}
+  .hero-olho{color:#F4F6EF}
+  .cartao-box{color:#F4F6EF}
+  .cartao-box.c-azul{background:linear-gradient(155deg,#1A355E,#2A5FA8)}
+  .cartao-box.c-ultravioleta{background:linear-gradient(155deg,#3E2660,#7A4FB0)}
+  .cartao-falta{color:rgba(244,246,239,.72)}
+  /* botões e navegação */
+  .addbtn,.escopo-btn{background:var(--lima);color:var(--lima-texto)}
+  .addbtn:hover{background:#BCD95F}
+  .escopo-btn.sec{background:#2A3031;color:var(--ink)}
+  .abas{background:#1A1F20}
+  .aba{color:var(--muted)}
+  .aba[aria-pressed="true"],.aba[data-vista][aria-pressed="true"]{background:var(--ink);color:#0E1112}
+  .fchip{background:#22282A;color:var(--muted)}
+  .fchip[aria-pressed="true"]{background:var(--ink);color:#0E1112}
+  .arrow,.toolbtn{background:var(--elevado);color:var(--ink);border-color:var(--rule)}
+  .arrow:hover{background:#262C2D}
+  .ghost{color:var(--ink)}
+  .ghost:hover{background:#262C2D}
+  .hamburger{background:#22282A;color:var(--ink)}
+  .hamburger.olho{background:#22282A;color:var(--ink);border-color:var(--rule)}
+  .menu-lateral{background:#151A1B;border-right:1px solid #232A2B}
+  .toast{background:#ECEEEA;color:#0E1112}
+  .sec-toggle{background:var(--card);color:var(--ink)}
+  .sec-toggle:hover{background:#1B2021}
+  /* chips de situação */
+  .chip{background:#262C2D;color:var(--muted)}
+  .chip.pago,.chip.inv-cdb,.chip.ganho{background:rgba(155,199,90,.16);color:#B9DB6A}
+  .chip.apagar{background:rgba(226,184,90,.16);color:#E8C36E}
+  .chip.vencido,.chip.perda{background:rgba(240,138,120,.16);color:#F4A595}
+  .chip.parcela,.chip.inv-cdi{background:rgba(181,150,230,.18);color:#CDB6F2}
+  .chip.inv-selic{background:rgba(127,168,232,.16);color:#A9C4F0}
+  .chip.inv-acao{background:rgba(224,138,171,.16);color:#EDB0C6}
+  .chip.avulsa{background:#262C2D;color:var(--muted)}
+  .del:hover{background:rgba(240,138,120,.14)}
+  .erro{background:rgba(240,138,120,.12)}
+  /* cartões / faturamento */
+  .conta-top{background:#1E2324}
+  .conta-top.c-azul{background:rgba(127,168,232,.13)}
+  .conta-top.c-ultravioleta{background:rgba(181,150,230,.13)}
+  .conta-top.c-verde{background:rgba(155,199,90,.13)}
+  .jobs-table tr.lin-recorrente td,.lin-recorrente{background:rgba(127,168,232,.10)}
+  .jobs-table tr.lin-avulso td,.lin-avulso{background:rgba(224,138,171,.10)}
+  .jobs-table tr.lin-freela td,.lin-freela{background:rgba(226,184,90,.10)}
+  .dropzone{background:#1B2021;border-color:#3A4243}
+  .dropzone:hover,.dropzone:focus-visible,.dropzone.sobre{background:#20272A;border-color:var(--ink)}
+  /* gráficos */
+  .barra-trilho{background:#1F2425}
+  .barra-fill{background:#5E7A6E}
+  .barra-fill.alto{background:var(--lima)}
+  .progresso{background:#262C2D}
+  .progresso-fill{background:var(--ink)}
+  /* Pix */
+  .pix-rapido{background:linear-gradient(135deg,#1A2214,#171B1C);border-color:#2A371C}
+  .pix-rapido .adder{background:rgba(255,255,255,.035)}
+  .pix-cal.alterada{background:rgba(169,206,70,.16);color:#CFE68A}
+  /* revisão do leitor de fatura */
+  .rev-tipo{background:#262C2D;color:var(--muted)}
+  .rev-tipo.t-estorno{background:rgba(155,199,90,.16);color:#B9DB6A}
+  .rev-tipo.t-pagamento{background:rgba(127,168,232,.16);color:#A9C4F0}
+  .rev-neg,.rev-neg .inline-val,.rev-sinal{color:#9BD27A!important}
+  .rev-pag .inline-val{color:#A9C4F0!important}
+  /* diálogo */
+  .escopo-ov{background:rgba(0,0,0,.6)}
+  .escopo-card{background:#1B2021;border:1px solid #2A3132}
+</style>
+
 
 <script>
 (function(){
@@ -676,11 +775,11 @@
   var imp={carregando:false,erro:null,itens:null,conta:'azul'};
 
   var CATEGORIAS=['Moradia','Transporte','Combustível','Saúde','Alimentação','Mercado','Pessoal','Impostos','Serviços','Assinaturas','Lazer','Educação','Cursos','Vestuário','Compras','Pets','Outros'];
-  var CORES_CAT={'Moradia':'#2A5FA8','Transporte':'#8C6712','Combustível':'#B0521F','Saúde':'#2E6B4E','Alimentação':'#A8496B','Mercado':'#3F7D4A','Pessoal':'#7A4FB0','Impostos':'#9A3B2C','Serviços':'#35528F','Assinaturas':'#A0527A','Lazer':'#B0763F','Educação':'#3F8F8C','Cursos':'#2E7D8C','Vestuário':'#B0507A','Compras':'#6B4FA0','Pets':'#5C8F3F','Outros':'#5E6B6B'};
-  function corCat(c){ return CORES_CAT[c]||'#5E6B6B'; }
+  var CORES_CAT={'Moradia':'#7FA8E8','Transporte':'#E2B85A','Combustível':'#F0A06A','Saúde':'#7CCB9A','Alimentação':'#E68BAE','Mercado':'#8FD08A','Pessoal':'#B596E6','Impostos':'#F08A78','Serviços':'#93ABE6','Assinaturas':'#E092BC','Lazer':'#EDB27A','Educação':'#74CFC9','Cursos':'#6FC2D3','Vestuário':'#EE93B9','Compras':'#A992E6','Pets':'#A6D27A','Outros':'#A3ADAB'};
+  function corCat(c){ return CORES_CAT[c]||'#A3ADAB'; }
   function corCatSuave(c){
     var hex=corCat(c).replace('#',''), r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
-    return 'rgba('+r+','+g+','+b+',.14)';
+    return 'rgba('+r+','+g+','+b+',.16)';
   }
   function catSelect(tipo,id,val){
     return '<span class="catsel" style="background:'+corCatSuave(val)+'"><span class="catdot" style="background:'+corCat(val)+'"></span>'+
