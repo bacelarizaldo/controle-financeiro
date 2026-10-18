@@ -469,6 +469,24 @@
   .pix-rapido{background:linear-gradient(135deg,#F0F5E8,#FFFFFF);border-color:#DEE8CF}.pix-rapido .sec-head{margin-bottom:8px}.pix-rapido .sec-head h2:before{content:'↗';display:inline-grid;place-items:center;width:27px;height:27px;margin-right:8px;border-radius:50%;background:#A9CE46;color:#173000;font-size:16px;vertical-align:1px}.pix-rapido .adder{background:rgba(255,255,255,.76)}
   .rev-parc{display:block;margin-top:3px;font-size:11px;font-weight:700;color:var(--violeta-esc)}
   .rev-total{display:block;margin-top:3px;font-size:11px;color:var(--muted);white-space:nowrap}
+  /* valores editáveis: borda visível e lápis para indicar que dá para alterar */
+  #app .inline-val[data-edit],#app .inline-val[data-jedit],#app .inline-val[data-receb]{border-color:#E1E2DD;background-color:rgba(255,255,255,.7);padding-right:24px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239AA19F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;background-size:12px;width:124px}
+  #app .jobs-table .inline-val[data-jedit],#app .jobs-table .inline-val[data-receb]{width:124px}
+  @media(max-width:480px){#app .inline-val[data-edit],#app .inline-val[data-jedit],#app .inline-val[data-receb]{width:104px;padding-left:6px;padding-right:6px;background-image:none;font-size:14px}}
+  #app .inline-val[data-edit]:hover,#app .inline-val[data-jedit]:hover,#app .inline-val[data-receb]:hover{border-color:#B9BFBC;background-color:#fff}
+  #app .inline-val[data-edit]:focus,#app .inline-val[data-jedit]:focus,#app .inline-val[data-receb]:focus{background-image:none;padding-right:8px;background-color:#fff}
+  .escopo-ov{position:fixed;inset:0;z-index:1000;background:rgba(16,20,21,.38);display:flex;align-items:flex-end;justify-content:center;padding:16px;animation:escopoIn .15s ease-out}
+  @media(min-width:621px){.escopo-ov{align-items:center}}
+  .escopo-card{background:#fff;border-radius:22px;padding:20px;max-width:420px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.22);font-family:var(--sans);color:var(--ink)}
+  .escopo-tit{font-weight:700;font-size:16px;color:var(--ink);margin-bottom:6px}
+  .escopo-det{font-size:13.5px;color:var(--muted);line-height:1.45;margin-bottom:16px}
+  .escopo-acoes{display:flex;gap:10px;flex-wrap:wrap}
+  .escopo-btn{flex:1 1 140px;height:42px;border-radius:999px;border:0;background:#15191A;color:#fff;font-weight:650;font-size:14px;cursor:pointer;font-family:var(--sans)}
+  .escopo-btn.sec{background:#F1F2EE;color:var(--ink)}
+  .escopo-btn:focus-visible{outline:2px solid #A9CE46;outline-offset:2px}
+  @keyframes escopoIn{from{opacity:0}to{opacity:1}}
   /* Resumo: categorias clicáveis */
   .cat-btn{border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;transition:filter .15s,transform .15s}
   .cat-btn:hover{filter:brightness(.96)}
@@ -2019,6 +2037,28 @@
 
   async function salvar(){ await sset(keyMes(mesId),mes); }
 
+  // pergunta se a mudança de valor vale só para este mês ou também para os próximos
+  function perguntarEscopo(titulo,detalhe){
+    return new Promise(function(resolve){
+      var ov=document.createElement('div'); ov.className='escopo-ov';
+      ov.innerHTML='<div class="escopo-card" role="dialog" aria-modal="true" aria-label="Aplicar alteração">'+
+        '<div class="escopo-tit"></div><div class="escopo-det"></div>'+
+        '<div class="escopo-acoes"><button type="button" class="escopo-btn sec" data-r="mes">Só este mês</button>'+
+        '<button type="button" class="escopo-btn" data-r="futuro">Este e os próximos</button></div></div>';
+      ov.querySelector('.escopo-tit').textContent=titulo;
+      ov.querySelector('.escopo-det').textContent=detalhe;
+      function fim(r){ ov.remove(); document.removeEventListener('keydown',tecla); resolve(r); }
+      function tecla(e){ if(e.key==='Escape') fim('mes'); }
+      ov.addEventListener('click',function(e){
+        var b=e.target.closest('[data-r]'); if(b) return fim(b.dataset.r);
+        if(e.target===ov) fim('mes');
+      });
+      document.addEventListener('keydown',tecla);
+      document.body.appendChild(ov);
+      ov.querySelector('[data-r="futuro"]').focus();
+    });
+  }
+
   async function irPara(id){
     var m=await sget(keyMes(id));
     if(!m){
@@ -2400,9 +2440,21 @@
     if(el.dataset.jedit){
       var jx=jobs.filter(function(x){return x.id===el.dataset.id;})[0];
       if(jx){
-        if(el.dataset.jedit==='tipo') jx.tipo=el.value;
-        else jx.valor=Math.abs(parseNum(el.value));
+        if(el.dataset.jedit==='tipo'){ jx.tipo=el.value; await sset(KEY_JOBS,jobs); render(); return; }
+        var vjn=Math.abs(parseNum(el.value));
+        if(Math.abs((+jx.valor||0)-vjn)<0.005){ render(); return; }
+        jx.valor=vjn;
         await sset(KEY_JOBS,jobs); render();
+        var futuros=jx.grupo?jobs.filter(function(x){return x.grupo===jx.grupo&&x.mes>jx.mes&&!recebidoJob(x);}):[];
+        if(futuros.length){
+          var esc2=await perguntarEscopo('Novo valor de '+jx.cliente+': '+money(vjn),
+            'Valer só para '+nomeMesCurto(jx.mes)+', ou também para '+(futuros.length===1?'o próximo mês':'os '+futuros.length+' próximos meses')+' desse recorrente? Meses anteriores não mudam.');
+          if(esc2==='futuro'){
+            futuros.forEach(function(x){ x.valor=vjn; });
+            await sset(KEY_JOBS,jobs); render();
+            toast('Valor atualizado a partir de '+nomeMesCurto(jx.mes)+'.');
+          }else toast('Valor alterado só em '+nomeMesCurto(jx.mes)+'.');
+        }
       }
       return;
     }
@@ -2412,13 +2464,32 @@
       if(tp==='fixa') alvo=mes.fixas.filter(function(x){return x.id===id;})[0];
       if(tp==='lanc') alvo=mes.lancamentos.filter(function(x){return x.id===id;})[0];
       if(alvo){
+        var antigo=+alvo.valor||0;
+        if(Math.abs(antigo-v)<0.005){ render(); return; }
         alvo.valor=v;
+        await salvar();
         if(alvo.refId&&(tp==='fixa'||tp==='entrada')){
           var lista=tp==='fixa'?cfg.contasFixas:cfg.entradasFixas;
           var tpl=lista.filter(function(x){return x.id===alvo.refId;})[0];
-          if(tpl){ tpl.valor=v; await sset(KEY_CFG,cfg); }
+          if(tpl){
+            render();
+            var esc1=await perguntarEscopo('Novo valor de '+alvo.nome+': '+money(v),
+              'Valer só para '+nomeMesCurto(mesId)+', ou também para os meses seguintes? Meses anteriores não mudam.');
+            if(esc1==='futuro'){
+              tpl.valor=v; await sset(KEY_CFG,cfg);
+              var chave=tp==='fixa'?'fixas':'entradas', mudou=0;
+              for(var mi=0;mi<meses.length;mi++){
+                if(meses[mi]<=mesId) continue;
+                var mf=await sget(keyMes(meses[mi])); if(!mf) continue;
+                var alterou=false;
+                (mf[chave]||[]).forEach(function(x){ if(x.refId===alvo.refId&&!x.pago){ x.valor=v; alterou=true; } });
+                if(alterou){ await sset(keyMes(meses[mi]),mf); mudou++; }
+              }
+              toast('Valor atualizado a partir de '+nomeMesCurto(mesId)+'.');
+            }else toast('Valor alterado só em '+nomeMesCurto(mesId)+'.');
+          }
         }
-        await salvar(); render();
+        render();
       }
       return;
     }
