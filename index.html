@@ -620,6 +620,19 @@
     }
     var f=mascaraReal(el.value); if(el.value!==f) el.value=f;
   });
+  // iPhone/Safari: como a máscara reescreve o valor a cada tecla, o Safari deixa de disparar
+  // o evento "change" ao sair do campo — e a alteração nunca era salva. Aqui, ao sair do
+  // campo, se o valor mudou e o "change" não veio, disparamos nós mesmos.
+  var SEL_SALVA_AO_SAIR='input[data-edit],input[data-jedit],input[data-rev="valor"],input[data-rev="descricao"]';
+  document.addEventListener('change',function(ev){ var el=ev.target; if(el&&el.matches&&el.matches(SEL_SALVA_AO_SAIR)) el._mudou=true; },true);
+  document.addEventListener('focusin',function(ev){ var el=ev.target; if(el&&el.matches&&el.matches(SEL_SALVA_AO_SAIR)) el._mudou=false; },true);
+  document.addEventListener('focusout',function(ev){
+    var el=ev.target; if(!el||!el.matches||!el.matches(SEL_SALVA_AO_SAIR)) return;
+    setTimeout(function(){
+      if(el._mudou) return;
+      if(el.value!==el.defaultValue){ el._mudou=true; el.dispatchEvent(new Event('change',{bubbles:true})); }
+    },0);
+  });
   document.addEventListener('focusin',function(ev){
     var el=ev.target; if(!el||!el.matches||!el.matches(SEL_REAL)) return;
     el._recemFocado=true;
