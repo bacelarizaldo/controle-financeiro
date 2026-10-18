@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232A2B"/><stop offset="1" stop-color="#121617"/></linearGradient>
+    <linearGradient id="lima" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C4E35F"/><stop offset="1" stop-color="#93BC2F"/></linearGradient>
+    <linearGradient id="media" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7E9C33"/><stop offset="1" stop-color="#5A7420"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#fundo)"/>
+  <rect x="2" y="2" width="508" height="508" rx="112" fill="none" stroke="#FFFFFF" stroke-opacity=".06" stroke-width="4"/>
+  <rect x="112" y="318" width="76" height="92" rx="22" fill="#3B4547"/>
+  <rect x="218" y="262" width="76" height="148" rx="22" fill="url(#media)"/>
+  <rect x="324" y="206" width="76" height="204" rx="22" fill="url(#lima)"/>
+  <path d="M112 246 L222 168 L284 204 L372 120" fill="none" stroke="#F4F6EF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M322 112 L392 100 L380 170" fill="none" stroke="#F4F6EF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
