@@ -494,6 +494,11 @@
   .escopo-btn.sec{background:#F1F2EE;color:var(--ink)}
   .escopo-btn:focus-visible{outline:2px solid #A9CE46;outline-offset:2px}
   @keyframes escopoIn{from{opacity:0}to{opacity:1}}
+  .data-hoje{height:39px;padding:0 11px;border-radius:11px;border:1px solid rgba(169,206,70,.4);background:transparent;color:#CFE68A;font-weight:650;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .pq-data{display:flex;gap:6px;align-items:center}
+  .dh-ico{display:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+  .pq-data{position:relative}
+  @media(max-width:620px){.data-hoje{position:absolute;top:-9px;right:-9px;z-index:2;width:22px;height:22px;padding:0;display:grid;place-items:center;border-radius:50%;background:#2A3132;border:1px solid rgba(169,206,70,.55)}.data-hoje .dh-txt{display:none}.data-hoje .dh-ico{display:block;width:11px;height:11px}.data-hoje[hidden]{display:none}}
   /* ===== novo job (estilo Pix) ===== */
   .job-adder{display:flex;flex-direction:column;align-items:stretch;gap:12px}
   .job-l1{display:grid;grid-template-columns:auto minmax(0,1fr) 140px;gap:10px;align-items:end}
@@ -610,7 +615,7 @@
   /* Registrar gasto via Pix: valor compacto, data como ícone de calendário */
   .pix-rapido .pix-adder{display:grid;grid-template-columns:112px minmax(0,1fr) minmax(0,190px) auto auto;grid-template-areas:"val desc cat cal btn";align-items:end;gap:10px}
   .pix-adder .field{min-width:0}
-  .pix-adder .pq-val{grid-area:val}.pix-adder .pq-desc{grid-area:desc}.pix-adder .pq-cat{grid-area:cat}.pix-adder .pix-cal{grid-area:cal}.pix-adder .pq-btn{grid-area:btn}
+  .pix-adder .pq-val{grid-area:val}.pix-adder .pq-desc{grid-area:desc}.pix-adder .pq-cat{grid-area:cat}.pix-adder .pq-data{grid-area:cal;display:flex;gap:6px;align-items:center}.pix-adder .pq-btn{grid-area:btn}
   #app .pix-adder .w-val,.pix-adder .field input,.pix-adder .field select{width:100%}
   #app .pix-adder #nq-val{text-align:left}
   .pix-cal{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:39px;height:39px;padding:0 9px;border:1px solid #E1E2DD;border-radius:11px;background:#fff;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
@@ -978,7 +983,8 @@
     return '<div class="pix-cal'+(valor===dataHojeISO()?'':' alterada')+'" title="Data: '+esc(rotuloDataPix(valor,true))+'">'+
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'+
       '<span class="pix-cal-rot">'+esc(rotuloDataPix(valor,false))+'</span>'+
-      '<input id="'+id+'" type="date" value="'+esc(valor)+'" aria-label="Data (padrão: hoje)"></div>';
+      '<input id="'+id+'" type="date" value="'+esc(valor)+'" data-padrao="'+esc(dataPadrao())+'" aria-label="Data (padrão: hoje)"></div>'+
+      '<button type="button" class="data-hoje" data-act="data-hoje" data-alvo="'+id+'" aria-label="Voltar para hoje" title="Voltar para hoje"'+(valor===dataPadrao()?' hidden':'')+'><span class="dh-txt">Hoje</span><svg class="dh-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
   }
   // rótulo do ícone de calendário do Pix: vazio quando é hoje, "dd/mm" quando a data foi trocada
   function rotuloDataPix(iso,longo){
@@ -1313,7 +1319,7 @@
     var dataJ=dataPadrao(), recJ=tipoNovoJob==='recorrente';
     h+='<div class="adder job-adder">';
     h+='<div class="job-l1">';
-    h+=campoData('nj-data',dataJ);
+    h+='<div class="pq-data">'+campoData('nj-data',dataJ)+'</div>';
     h+='<div class="field"><label for="nj-cli">Descrição</label><input id="nj-cli" placeholder="Cliente · projeto"></div>';
     h+='<div class="field"><label for="nj-val">Valor</label><input id="nj-val" class="w-val" placeholder="R$ 0,00"></div>';
     h+='</div><div class="job-l2">';
@@ -2186,10 +2192,7 @@
     h+='<div class="field pq-val"><label for="nq-val">Valor</label><input id="nq-val" class="w-val" placeholder="R$ 0,00" inputmode="decimal"></div>';
     h+='<div class="field pq-desc"><label for="nq-desc">Descrição</label><input id="nq-desc" placeholder="Mercado, combustível…"></div>';
     h+='<div class="field pq-cat"><label for="nq-cat">Categoria</label><select id="nq-cat">'+CATEGORIAS.map(function(c){return '<option'+(c==='Alimentação'?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>';
-    h+='<div class="pix-cal'+(dataQ===dataHojeISO()?'':' alterada')+'" title="Data do gasto: '+esc(rotuloDataPix(dataQ,true))+'">'+
-      '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'+
-      '<span class="pix-cal-rot">'+esc(rotuloDataPix(dataQ,false))+'</span>'+
-      '<input id="nq-data" type="date" value="'+esc(dataQ)+'" aria-label="Data do gasto (padrão: hoje)"></div>';
+    h+='<div class="pq-data">'+campoData('nq-data',dataQ)+'</div>';
     h+='<button class="addbtn pq-btn" data-act="add-lanc-rapido">Adicionar<span class="pq-btn-extra"> gasto</span></button></div></section>';
 
     // entradas
@@ -2484,6 +2487,11 @@
     if(t.dataset.toggleSecao){ var ks=t.dataset.toggleSecao; secoesMesAbertas[ks]=!secoesMesAbertas[ks]; render(); return; }
     if(t.dataset.act==='toggle-menu'){ menuAberto=!menuAberto; render(); return; }
     if(t.dataset.act==='toggle-valores'){ valoresOcultos=!valoresOcultos; render(); return; }
+    if(t.dataset.act==='data-hoje'){
+      var campoD=document.getElementById(t.dataset.alvo);
+      if(campoD){ campoD.value=dataPadrao(); campoD._mexido=false; atualizarCampoData(campoD); }
+      return;
+    }
     if(t.dataset.act==='nj-tipo'){
       tipoNovoJob=t.dataset.tipo;
       var form=t.closest('.job-adder');
@@ -2727,18 +2735,37 @@
   // ícone de calendário do Pix: no computador abre o seletor de data ao clicar em qualquer parte do ícone
   document.addEventListener('click',function(ev){
     var el=ev.target; if(!el||!el.closest||!el.closest('.pix-cal')||el.type!=='date') return;
+    var mouse=window.matchMedia&&window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+    if(!mouse) return;
     try{ if(el.showPicker) el.showPicker(); }catch(e){}
   });
+  function atualizarCampoData(el){
+    var wrap=el.closest('.pix-cal'); if(!wrap) return;
+    if(!el.value) el.value=dataPadrao();
+    wrap.querySelector('.pix-cal-rot').textContent=rotuloDataPix(el.value,false);
+    var alterada=el.value!==dataPadrao();
+    wrap.classList.toggle('alterada',alterada);
+    wrap.title='Data: '+rotuloDataPix(el.value,true);
+    var volta=wrap.parentNode&&wrap.parentNode.querySelector('.data-hoje[data-alvo="'+el.id+'"]');
+    if(volta) volta.hidden=!alterada;
+  }
+  // ao voltar para o app (ex.: deixado aberto de um dia para o outro), a data padrão volta a ser hoje
+  function renovarDatasPadrao(){
+    document.querySelectorAll('.pix-cal input[type=date]').forEach(function(el){
+      if(!el.closest('.pix-cal').classList.contains('alterada')||el.dataset.padrao!==dataPadrao()){
+        if(!el._mexido){ el.value=dataPadrao(); el.dataset.padrao=dataPadrao(); atualizarCampoData(el); }
+      }
+    });
+  }
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') renovarDatasPadrao(); });
+  window.addEventListener('focus',renovarDatasPadrao);
 
   document.addEventListener('change',async function(ev){
     var el=ev.target; if(!el.dataset&&el.id!=='imp-imagens') return;
 
     if(el.type==='date'&&el.closest&&el.closest('.pix-cal')){
-      var wrap=el.closest('.pix-cal'); if(!wrap) return;
-      if(!el.value) el.value=dataPadrao();
-      wrap.querySelector('.pix-cal-rot').textContent=rotuloDataPix(el.value,false);
-      wrap.classList.toggle('alterada',el.value!==dataHojeISO());
-      wrap.title='Data do gasto: '+rotuloDataPix(el.value,true);
+      el._mexido=true;
+      atualizarCampoData(el);
       return;
     }
 
