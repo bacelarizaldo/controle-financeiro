@@ -1,12 +1,20 @@
 // Verificação de sessão compartilhada entre as funções da API.
 // Usa um cookie assinado com HMAC (sem biblioteca externa e sem tabela
 // de sessão no banco) — as senhas em si ficam só na variável de
-// ambiente APP_USERS, nunca no cookie. O cookie carrega apenas o nome
-// de usuário e a validade, pra dar pra saber quem está logado.
+// ambiente APP_USERS (agora como HASH, não texto puro), nunca no cookie.
+// O cookie carrega apenas o nome de usuário e a validade, pra dar pra
+// saber quem está logado.
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const COOKIE = 'fin_session';
-const DIAS = 60;
+const DIAS_LEMBRAR = 60;   // sessão longa, só quando a pessoa marca "lembrar de mim"
+const HORAS_PADRAO = 12;   // sessão curta (padrão): expira sozinha, mesmo sem fechar o app
+
+// Hash "vazio" só pra gastar o mesmo tempo de CPU quando o usuário nem
+// existe — evita que alguém descubra quais usuários são válidos medindo
+// quanto tempo a resposta demora.
+const HASH_FALSO = '$2a$10$C6UzMDM.H6dfI/f/IKcEeO7Kb7B4qHwyu1IKzTC/9K1cPmyPY5.3G';
 
 // Login desligado: o app abre direto, sem senha, para qualquer pessoa com o
 // link. Para voltar a exigir login, crie na Vercel a variável de ambiente
@@ -27,17 +35,39 @@ function usuarios() {
   try {
     return JSON.parse(raw);
   } catch (e) {
-    throw new Error('APP_USERS precisa ser um JSON válido, tipo {"izaldo":"senha1","heloisa":"senha2"}.');
+    throw new Error('APP_USERS precisa ser um JSON válido, tipo {"izaldo":"$2a$10$...","heloisa":"$2a$10$..."} (hashes gerados com scripts/gerar-hash.js, não a senha em texto puro).');
   }
 }
 
-function verificarLogin(usuario, senha) {
+// Agora é assíncrona: bcrypt.compare precisa recalcular o hash da senha
+// digitada e comparar com o hash guardado.
+async function verificarLogin(usuario, senha) {
   const mapa = usuarios();
   const chave = Object.keys(mapa).filter(function (u) { return u.toLowerCase() === String(usuario || '').toLowerCase(); })[0];
-  if (!chave) return false;
-  const a = crypto.createHash('sha256').update(String(mapa[chave])).digest();
-  const b = crypto.createHash('sha256').update(String(senha)).digest();
-  return crypto.timingSafeEqual(a, b);
+  if (!chave) {
+    // usuário não existe: ainda assim roda um bcrypt.compare contra um
+    // hash falso, pra gastar tempo parecido com o caso de usuário válido
+    try { await bcrypt.compare(String(senha || ''), HASH_FALSO); } catch (e) {}
+    return false;
+  }
+  const hashGuardado = mapa[chave];
+  if (!hashGuardado) return false;
+  if (String(hashGuardado).indexOf('$2') !== 0) {
+    // Transição: APP_USERS ainda com senha em texto puro (não começa com
+    // $2a$/$2b$, formato bcrypt). Aceita por enquanto para ninguém ficar
+    // trancado fora, mas avisa no log. Depois de trocar todas as senhas
+    // por hashes (scripts/gerar-hash.js), defina SENHA_SO_HASH=1 na Vercel
+    // para recusar texto puro de vez.
+    if (process.env.SENHA_SO_HASH === '1') {
+      throw new Error('APP_USERS contém uma senha que não parece ser um hash bcrypt. Gere o hash com scripts/gerar-hash.js e atualize a variável de ambiente.');
+    }
+    console.warn('APP_USERS: senha em texto puro para "' + chave + '"; troque pelo hash gerado com scripts/gerar-hash.js.');
+    try { await bcrypt.compare(String(senha || ''), HASH_FALSO); } catch (e) {}
+    const a = crypto.createHash('sha256').update(String(hashGuardado)).digest();
+    const b = crypto.createHash('sha256').update(String(senha || '')).digest();
+    return crypto.timingSafeEqual(a, b);
+  }
+  return bcrypt.compare(String(senha || ''), hashGuardado);
 }
 
 function assinar(exp, usuario) {
@@ -93,10 +123,18 @@ function exigirAuth(req, res) {
   return true;
 }
 
-function cookieLogin(usuario) {
-  const exp = Date.now() + DIAS * 24 * 60 * 60 * 1000;
-  const maxAge = DIAS * 24 * 60 * 60;
-  return COOKIE + '=' + assinar(exp, usuario) + '; HttpOnly; Secure; SameSite=Lax; Max-Age=' + maxAge + '; Path=/';
+// lembrar=true: cookie persistente de 60 dias (Max-Age), como antes.
+// lembrar=false (padrão): cookie de SESSÃO — sem Max-Age, então o
+// navegador o apaga ao fechar de verdade — e o token em si expira em
+// 12h mesmo que o navegador/PWA mantenha o cookie vivo além disso. É
+// esse o "ciclo de login" pedido: sem marcar lembrar, a sessão não dura
+// pra sempre só por manter o app aberto/instalado.
+function cookieLogin(usuario, lembrar) {
+  const ms = lembrar ? DIAS_LEMBRAR * 24 * 60 * 60 * 1000 : HORAS_PADRAO * 60 * 60 * 1000;
+  const exp = Date.now() + ms;
+  let cookie = COOKIE + '=' + assinar(exp, usuario) + '; HttpOnly; Secure; SameSite=Lax; Path=/';
+  if (lembrar) cookie += '; Max-Age=' + Math.floor(ms / 1000);
+  return cookie;
 }
 
 function cookieLogout() {

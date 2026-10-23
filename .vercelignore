@@ -1,0 +1,5 @@
+# Arquivos que existem no repositório mas não devem ser publicados no site.
+.claude
+.DS_Store
+*.md
+scripts

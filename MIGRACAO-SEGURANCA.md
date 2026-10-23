@@ -10,32 +10,29 @@
 
 ## Passo a passo
 
-1. **Substitua os arquivos** no seu projeto local pelos que estão aqui (mesmos nomes e caminhos).
+O código já está aplicado (pasta `api/`). Falta só trocar as senhas por hashes:
 
-2. **Instale a nova dependência:**
-   ```
-   npm install
-   ```
+1. **Instale as dependências** (uma vez): `npm install`
 
-3. **Gere o hash de cada senha atual:**
+2. **Gere o hash de cada senha atual**, no terminal, dentro da pasta do projeto:
    ```
    node scripts/gerar-hash.js "senha-do-izaldo"
    node scripts/gerar-hash.js "senha-da-heloisa"
    ```
    Cada comando imprime uma string tipo `$2a$10$...` — é o hash daquela senha.
 
-4. **Atualize a variável `APP_USERS` na Vercel** (Project Settings → Environment
+3. **Atualize a variável `APP_USERS` na Vercel** (Settings → Environment
    Variables) trocando as senhas em texto puro pelos hashes gerados:
    ```json
    {"izaldo":"$2a$10$hash-gerado-aqui","heloisa":"$2a$10$outro-hash-aqui"}
    ```
 
-5. **Commit e push** normalmente — a Vercel faz o redeploy sozinha. Se preferir,
-   force um redeploy manual em Deployments → "⋯" → Redeploy pra garantir que a
-   variável nova entrou em vigor.
+4. **Crie a variável `SENHA_SO_HASH` com valor `1`** — a partir daí senha em
+   texto puro no `APP_USERS` é recusada. Sem ela, o login ainda aceita texto
+   puro (modo de transição, com aviso no log).
 
-6. **Teste o login** com a senha normal (não o hash) — o app continua pedindo a
-   senha de sempre, só a forma de guardar/comparar mudou.
+5. **Redeploy** (Deployments → "⋯" → Redeploy) e **teste o login** com a senha
+   normal (não o hash).
 
 ## Sobre o bloqueio de tentativas
 Depois de 5 tentativas erradas na mesma combinação IP+usuário em 15 minutos, o
