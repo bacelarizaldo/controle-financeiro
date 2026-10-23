@@ -22,7 +22,8 @@ module.exports = async function handler(req, res) {
       return;
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Erro ao checar bloqueio de login:', e.message);
+    res.status(500).json({ error: 'Não foi possível entrar agora. Tente de novo mais tarde.' });
     return;
   }
 
@@ -30,7 +31,11 @@ module.exports = async function handler(req, res) {
   try {
     ok = await verificarLogin(usuario, senha);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    // O detalhe (ex.: APP_USERS mal configurado) vai só para o log da
+    // Vercel; quem está na tela de login não precisa saber como o servidor
+    // está configurado.
+    console.error('Erro no login:', e.message);
+    res.status(500).json({ error: 'Não foi possível entrar agora. Tente de novo mais tarde.' });
     return;
   }
 
