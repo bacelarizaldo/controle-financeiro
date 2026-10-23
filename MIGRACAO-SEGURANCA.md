@@ -16,10 +16,9 @@ O código já está aplicado (pasta `api/`). Falta só trocar as senhas por hash
 
 2. **Gere o hash de cada senha atual**, no terminal, dentro da pasta do projeto:
    ```
-   node scripts/gerar-hash.js "senha-do-izaldo"
-   node scripts/gerar-hash.js "senha-da-heloisa"
+   node scripts/gerar-hash.js
    ```
-   Cada comando imprime uma string tipo `$2a$10$...` — é o hash daquela senha.
+   Rode uma vez por pessoa. A senha é pedida sem aparecer na tela, e o comando imprime uma string tipo `$2a$10$...` — é o hash daquela senha.
 
 3. **Atualize a variável `APP_USERS` na Vercel** (Settings → Environment
    Variables) trocando as senhas em texto puro pelos hashes gerados:
