@@ -524,34 +524,52 @@
     .job-l2 .nj-ate-campo{flex:1 1 auto}
     .job-l2 .nj-ate-campo select{width:100%}
   }
-  /* ===== cartões: parcelados x compras do mês ===== */
-  .grupo-cartao{border-radius:16px;padding:12px 14px 6px;margin-top:10px;border:1px solid var(--campo-borda);background:#191E1F}
+  /* ===== cartões: um bloco por cartão, parcelados x compras do mês ===== */
+  .cartoes-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;align-items:start;margin-bottom:16px}
+  #app .cartao-col{margin:0;padding:0;overflow:hidden}
+  .cartao-col h2{margin:0;font-size:inherit;font-weight:inherit}
+  .cartao-head{display:flex;flex-direction:column;justify-content:flex-start;width:100%;border:0;text-align:left;font:inherit;color:#F4F6EF;cursor:pointer;padding:18px 20px 17px;background:linear-gradient(155deg,#22282A,#2E3536);-webkit-appearance:none;appearance:none}
+  .cartao-head.c-azul{background:linear-gradient(155deg,#1A355E,#2A5FA8)}
+  .cartao-head.c-ultravioleta{background:linear-gradient(155deg,#3E2660,#7A4FB0)}
+  .cartao-head:focus-visible{outline:2px solid #A9CE46;outline-offset:-2px}
+  .ch-nome{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:620;color:rgba(244,246,239,.78)}
+  .cartao-head .chev{color:rgba(244,246,239,.78);font-size:20px}
+  .ch-total{display:block;font-size:26px;font-weight:740;letter-spacing:-.045em;font-variant-numeric:tabular-nums;margin-top:2px}
+  .cartao-corpo{padding:4px 14px 14px}
+  .grupo-cartao{border-radius:16px;padding:2px 14px;margin-top:10px;border:1px solid var(--campo-borda);background:#191E1F}
   .g-parc{border-color:rgba(181,150,230,.35);background:linear-gradient(180deg,rgba(181,150,230,.09),rgba(181,150,230,.02))}
-  .gc-cab{display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--rule-soft)}
+  .gc-cab{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;padding:11px 0 10px;border-bottom:1px solid var(--rule-soft)}
+  .gc-cab:last-child{border-bottom:0}
   .gc-tit{font-weight:720;font-size:14.5px}
   .g-parc .gc-tit{color:#CDB6F2}
-  .gc-info{font-size:12px;color:var(--muted)}
-  .gc-tot{margin-left:auto;font-weight:720;font-size:15px}
-  .gc-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto auto 26px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule-soft)}
+  .gc-info{grid-row:2;font-size:12px;color:var(--muted);margin-top:1px}
+  .gc-tot{grid-column:2;grid-row:1/3;font-weight:720;font-size:15.5px;white-space:nowrap}
+  .gc-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto 26px;grid-template-areas:"desc cat val del" "meta cat val del";column-gap:12px;row-gap:3px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule-soft)}
   .gc-item:last-child{border-bottom:0}
-  .gc-data{font-size:12.5px;color:var(--muted)}
-  .gc-desc{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-  .gc-desc small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
-  .gc-parcela{font-size:12px;font-weight:720;color:#0E1112;background:#B596E6;border-radius:999px;padding:2px 8px;white-space:nowrap}
-  .gc-val{font-weight:650;white-space:nowrap;text-align:right;min-width:82px}
-  .gc-item .del{width:26px;height:26px}
-  .gc-pi{display:none}
+  .gc-desc{grid-area:desc;min-width:0;font-size:14px;font-weight:560;overflow-wrap:anywhere}
+  .gc-meta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:3px 7px;font-size:12px;color:var(--muted)}
+  #app .gc-data{font-size:12px;font-weight:600;color:var(--muted)}
+  .gc-parcela{font-size:10.5px;font-weight:720;color:#0E1112;background:#B596E6;border-radius:999px;padding:1px 7px;white-space:nowrap}
+  .gc-cat{grid-area:cat;justify-self:end}
+  .gc-val{grid-area:val;font-weight:650;white-space:nowrap;text-align:right;min-width:82px}
+  .gc-item .del{grid-area:del;width:26px;height:26px}
   .g-est{border-color:rgba(155,199,90,.3)}.g-est .gc-tit,.g-est .gc-val,.g-est .gc-tot{color:#9BD27A}
   .g-pag{border-color:rgba(127,168,232,.3)}.g-pag .gc-tit,.g-pag .gc-val,.g-pag .gc-tot{color:#A9C4F0}
+  .gc-vazio{font-size:13px;color:var(--muted);padding:10px 0 12px}
+  .nc-desc{flex:1 1 180px}
   @media(max-width:620px){
-    .gc-item{grid-template-columns:40px minmax(0,1fr) auto 24px;gap:8px}
-    .gc-item>span:empty{display:none}
-    .gc-cat{display:none}
-    .gc-item>.gc-parcela{display:none}
-    .gc-pi{display:inline-block;margin-right:6px;font-size:10.5px;padding:1px 6px}
-    .gc-desc{white-space:normal}
-    .gc-desc small{display:flex;align-items:center}
+    .cartao-head{padding:16px 18px 15px}
+    .ch-total{font-size:24px}
+    .cartao-corpo{padding:2px 10px 12px}
+    .grupo-cartao{padding:2px 12px}
+    .gc-item{grid-template-columns:minmax(0,1fr) auto 24px;grid-template-areas:"desc val del" "meta cat del";column-gap:10px;row-gap:6px}
+    .gc-cat:empty{display:none}
+    .gc-desc,.gc-val{align-self:start}
+    .gc-val{min-width:0}
+    .gc-item .del{align-self:start;margin-top:-4px}
   }
+  /* dois cartões lado a lado: cabeçalhos com a mesma altura, com ou sem a linha de antecipado */
+  @media(min-width:905px){.cartao-head{min-height:116px}}
   /* ===== filtro de jobs por tipo ===== */
   .filtro-tipos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0 12px}
   .ft-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 13px;border-radius:16px;border:1px solid var(--campo-borda);background:var(--elevado);color:var(--ink);text-align:left;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s}
@@ -1917,10 +1935,70 @@
     if(totPagoMes) h+='<div class="hero-cell"><span>Pago antecipado</span><b>'+moneyExib(totPagoMes)+'</b></div>';
     h+='</div></div>';
 
-    h+='<div class="cartao-boxes">';
+    function linhaCartao(desc,meta,cat,val,del){
+      return '<div class="gc-item"><span class="gc-desc">'+desc+'</span><span class="gc-meta">'+meta+'</span>'+
+        '<span class="gc-cat">'+cat+'</span><span class="gc-val val">'+val+'</span>'+del+'</div>';
+    }
+    function dataCartao(d){ return '<span class="gc-data val">'+esc(dataCurta(d))+'</span>'; }
+    function delCartao(tipo,id){ return '<button class="del" data-del="'+tipo+'" data-id="'+id+'" aria-label="Remover">×</button>'; }
+    h+='<div class="cartoes-grid">';
     cartoes.forEach(function(c){
+      var itens=itensCartao(m,c.id);
+      var parc=itens.filter(function(l){return !!l.parcelado;});
+      var avl=itens.filter(function(l){return !l.parcelado&&l.tipo!=='estorno';});
+      var estC=itens.filter(function(l){return l.tipo==='estorno';});
+      var pagC=pagamentosDoCartao(m,c.id);
       var pgC=totPagoCartao(m,c.id);
-      h+='<div class="cartao-box c-'+c.id+'"><span>'+esc(c.nome)+'</span><b>'+moneyExib(totConta(m,c.id))+'</b>'+(pgC?'<small class="cartao-falta">Antecipado '+moneyExib(pgC)+' · falta '+moneyExib(Math.max(totConta(m,c.id)-pgC,0))+'</small>':'')+'</div>';
+      var keyC='cartao:'+c.id;
+      var abertoC=cardsAbertos[keyC]!==false; // aberto por padrão
+      h+='<section class="cartao-col"><h2><button type="button" class="cartao-head c-'+c.id+'" data-toggle-card="'+keyC+'" aria-expanded="'+abertoC+'">';
+      h+='<span class="ch-nome">'+esc(c.nome)+'<span class="chev'+(abertoC?' aberto':'')+'">›</span></span>';
+      h+='<span class="ch-total">'+moneyExib(totConta(m,c.id))+'</span>';
+      if(pgC) h+='<small class="cartao-falta">Antecipado '+moneyExib(pgC)+' · falta '+moneyExib(Math.max(totConta(m,c.id)-pgC,0))+'</small>';
+      h+='</button></h2>';
+      if(abertoC){
+      h+='<div class="cartao-corpo">';
+      // parcelados: bloco roxo, com a parcela em destaque e quantas faltam
+      var totParc=parc.reduce(function(a,l){return a+l.valor;},0);
+      h+='<div class="grupo-cartao g-parc"><div class="gc-cab"><span class="gc-tit">Parcelados</span><span class="gc-info">'+parc.length+(parc.length===1?' parcela':' parcelas')+'</span><b class="gc-tot val">'+moneyExib(totParc)+'</b></div>';
+      if(parc.length){
+        parc.forEach(function(l){
+          var pcL=detectaParcela(l.descricao), faltam=pcL?pcL.total-pcL.atual:0;
+          var meta=dataCartao(l.data)+(pcL?'<span class="gc-parcela">'+pcL.atual+'/'+pcL.total+'</span><span>'+(faltam?'faltam '+faltam+(faltam===1?' parcela':' parcelas'):'última parcela')+'</span>':'<span>parcelado</span>');
+          h+=linhaCartao(esc(pcL?nomeSemParcela(l.descricao):l.descricao),meta,catSelect('lanc',l.id,l.categoria),moneyExib(l.valor),delCartao('lanc',l.id));
+        });
+      }else{
+        h+='<div class="gc-vazio">Nada parcelado neste cartão.</div>';
+      }
+      h+='</div>';
+      var totAvl=avl.reduce(function(a,l){return a+l.valor;},0);
+      h+='<div class="grupo-cartao g-avl"><div class="gc-cab"><span class="gc-tit">Compras do mês</span><span class="gc-info">'+avl.length+(avl.length===1?' compra':' compras')+'</span><b class="gc-tot val">'+moneyExib(totAvl)+'</b></div>';
+      if(avl.length){
+        avl.forEach(function(l){
+          h+=linhaCartao(esc(l.descricao),dataCartao(l.data),catSelect('lanc',l.id,l.categoria),moneyExib(l.valor),delCartao('lanc',l.id));
+        });
+      }else{
+        h+='<div class="gc-vazio">Nenhuma compra avulsa neste cartão.</div>';
+      }
+      h+='</div>';
+      if(estC.length){
+        h+='<div class="grupo-cartao g-est"><div class="gc-cab"><span class="gc-tit">Estornos</span><span class="gc-info">abatem da fatura</span><b class="gc-tot val">−'+moneyExib(Math.abs(estC.reduce(function(a,l){return a+l.valor;},0)))+'</b></div>';
+        estC.forEach(function(l){
+          h+=linhaCartao(esc(l.descricao),dataCartao(l.data),catSelect('lanc',l.id,l.categoria),'−'+moneyExib(Math.abs(l.valor)),delCartao('lanc',l.id));
+        });
+        h+='</div>';
+      }
+      if(pagC.length){
+        var totPg=pagC.reduce(function(a,p){return a+(+p.valor||0);},0);
+        h+='<div class="grupo-cartao g-pag"><div class="gc-cab"><span class="gc-tit">Pagamento antecipado</span><span class="gc-info">falta pagar '+moneyExib(Math.max(totConta(m,c.id)-totPg,0))+'</span><b class="gc-tot val">'+moneyExib(totPg)+'</b></div>';
+        pagC.forEach(function(p){
+          h+=linhaCartao(esc(p.descricao),dataCartao(p.data)+'<span>não entra nos gastos</span>','',moneyExib(p.valor),delCartao('pagfat',p.id));
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+      }
+      h+='</section>';
     });
     h+='</div>';
 
@@ -1974,80 +2052,12 @@
     h+='</div>';
     h+='<div class="adder">';
     h+='<div class="field"><label for="nc-data">Data</label><input id="nc-data" type="date" value="'+esc(dataPadrao())+'"></div>';
-    h+='<div class="field"><label for="nc-desc">Descrição</label><input id="nc-desc" style="width:180px" placeholder="Nome da compra"></div>';
+    h+='<div class="field nc-desc"><label for="nc-desc">Descrição</label><input id="nc-desc" style="width:100%" placeholder="Nome da compra"></div>';
     h+='<div class="field-row" style="flex:1 1 240px"><div class="field" style="flex:1 1 auto"><label for="nc-cat">Categoria</label><select id="nc-cat" style="width:100%">'+CATEGORIAS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>';
     h+='<div class="field" style="flex:1 1 auto"><label for="nc-conta">Cartão</label><select id="nc-conta" style="width:100%">'+cartoes.map(function(c){return '<option value="'+c.id+'"'+(imp.conta===c.id?' selected':'')+'>'+esc(c.nome)+'</option>';}).join('')+'</select></div></div>';
     h+='<div class="field"><label for="nc-val">Valor</label><input id="nc-val" class="w-val" placeholder="R$ 0,00"></div>';
     h+='<button class="addbtn" data-act="add-cartao">Lançar</button></div>';
     h+='</section>';
-
-    cartoes.forEach(function(c){
-      var itens=itensCartao(m,c.id);
-      var parc=itens.filter(function(l){return !!l.parcelado;});
-      var avl=itens.filter(function(l){return !l.parcelado&&l.tipo!=='estorno';});
-      var estC=itens.filter(function(l){return l.tipo==='estorno';});
-      var pagC=pagamentosDoCartao(m,c.id);
-      var keyC='cartao:'+c.id;
-      var abertoC=cardsAbertos[keyC]!==false; // aberto por padrão
-      h+='<section><div class="sec-head"><h2>'+esc(c.nome)+'</h2><span class="sec-total">'+moneyExib(totConta(m,c.id))+'</span></div>';
-      h+='<div class="conta-bloco"><button type="button" class="conta-top c-'+c.id+'" data-toggle-card="'+keyC+'" aria-expanded="'+abertoC+'"><b>'+esc(c.nome)+'</b><span style="display:flex;align-items:center;gap:10px"><span class="val">'+moneyExib(totConta(m,c.id))+'</span><span class="chev'+(abertoC?' aberto':'')+'">›</span></span></button>';
-      if(abertoC){
-      h+='<div class="conta-body">';
-      // parcelados: bloco roxo, com a parcela em destaque e quantas faltam
-      var totParc=parc.reduce(function(a,l){return a+l.valor;},0);
-      h+='<div class="grupo-cartao g-parc"><div class="gc-cab"><span class="gc-tit">Parcelados</span><span class="gc-info">'+parc.length+(parc.length===1?' parcela':' parcelas')+'</span><b class="gc-tot val">'+moneyExib(totParc)+'</b></div>';
-      if(parc.length){
-        parc.forEach(function(l){
-          var pcL=detectaParcela(l.descricao), faltam=pcL?pcL.total-pcL.atual:0;
-          h+='<div class="gc-item"><span class="gc-data val">'+esc(dataCurta(l.data))+'</span>';
-          h+='<span class="gc-desc">'+esc(pcL?nomeSemParcela(l.descricao):l.descricao)+'<small>'+(pcL?'<span class="gc-parcela gc-pi">'+pcL.atual+'/'+pcL.total+'</span>':'')+(pcL?(faltam?'faltam '+faltam+(faltam===1?' parcela':' parcelas'):'última parcela'):'parcelado')+'</small></span>';
-          h+=(pcL?'<span class="gc-parcela">'+pcL.atual+'/'+pcL.total+'</span>':'<span></span>');
-          h+='<span class="gc-cat">'+catSelect('lanc',l.id,l.categoria)+'</span>';
-          h+='<span class="gc-val val">'+moneyExib(l.valor)+'</span>';
-          h+='<button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></div>';
-        });
-      }else{
-        h+='<div class="vazio" style="padding:6px 0">Nada parcelado neste cartão.</div>';
-      }
-      h+='</div>';
-      var totAvl=avl.reduce(function(a,l){return a+l.valor;},0);
-      h+='<div class="grupo-cartao g-avl"><div class="gc-cab"><span class="gc-tit">Compras do mês</span><span class="gc-info">'+avl.length+(avl.length===1?' compra':' compras')+'</span><b class="gc-tot val">'+moneyExib(totAvl)+'</b></div>';
-      if(avl.length){
-        avl.forEach(function(l){
-          h+='<div class="gc-item"><span class="gc-data val">'+esc(dataCurta(l.data))+'</span>';
-          h+='<span class="gc-desc">'+esc(l.descricao)+'</span><span></span>';
-          h+='<span class="gc-cat">'+catSelect('lanc',l.id,l.categoria)+'</span>';
-          h+='<span class="gc-val val">'+moneyExib(l.valor)+'</span>';
-          h+='<button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></div>';
-        });
-      }else{
-        h+='<div class="vazio" style="padding:6px 0 10px">Nenhuma compra avulsa neste cartão.</div>';
-      }
-      h+='</div>';
-      if(estC.length){
-        h+='<div class="grupo-cartao g-est"><div class="gc-cab"><span class="gc-tit">Estornos</span><span class="gc-info">abatem da fatura</span><b class="gc-tot val">−'+moneyExib(Math.abs(estC.reduce(function(a,l){return a+l.valor;},0)))+'</b></div>';
-        estC.forEach(function(l){
-          h+='<div class="gc-item"><span class="gc-data val">'+esc(dataCurta(l.data))+'</span><span class="gc-desc">'+esc(l.descricao)+'</span><span></span>';
-          h+='<span class="gc-cat">'+catSelect('lanc',l.id,l.categoria)+'</span>';
-          h+='<span class="gc-val val">−'+moneyExib(Math.abs(l.valor))+'</span>';
-          h+='<button class="del" data-del="lanc" data-id="'+l.id+'" aria-label="Remover">×</button></div>';
-        });
-        h+='</div>';
-      }
-      if(pagC.length){
-        var totPg=pagC.reduce(function(a,p){return a+(+p.valor||0);},0);
-        h+='<div class="grupo-cartao g-pag"><div class="gc-cab"><span class="gc-tit">Pagamento antecipado</span><span class="gc-info">falta pagar '+moneyExib(Math.max(totConta(m,c.id)-totPg,0))+'</span><b class="gc-tot val">'+moneyExib(totPg)+'</b></div>';
-        pagC.forEach(function(p){
-          h+='<div class="gc-item"><span class="gc-data val">'+esc(dataCurta(p.data))+'</span><span class="gc-desc">'+esc(p.descricao)+'<small>não entra nos gastos</small></span><span></span><span class="gc-cat"></span>';
-          h+='<span class="gc-val val">'+moneyExib(p.valor)+'</span>';
-          h+='<button class="del" data-del="pagfat" data-id="'+p.id+'" aria-label="Remover">×</button></div>';
-        });
-        h+='</div>';
-      }
-      h+='</div>';
-      }
-      h+='</div></section>';
-    });
 
     return h;
   }
