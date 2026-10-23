@@ -997,27 +997,12 @@
   }
 
   // ---------- leitura de fatura por imagem ----------
-  function promptExtracao(){
-    return 'Você está lendo um extrato de cartão de crédito ou de conta bancária brasileira, enviado como imagem (print).\n'+
-      'Em imagens de aplicativo bancário, cada linha com nome de estabelecimento e valor em R$ é uma compra. Extraia TODAS as compras visíveis, mesmo quando a data vier apenas no cabeçalho acima delas. Por exemplo, "ontem, 17 de maio" vale para todas as linhas seguintes até aparecer outro cabeçalho de data. Textos como "apple pay", "cartão físico" e ícones são apenas detalhes do meio de pagamento, não são compras separadas.\n'+
-      'Extraia três tipos de linha e informe o campo tipo em cada uma:\n'+
-      '- tipo "compra": gastos/débitos comuns (inclui juros, IOF, anuidade e tarifas).\n'+
-      '- tipo "estorno": dinheiro devolvido de uma compra — estorno, devolução, reembolso, cancelamento, crédito na fatura, cashback, ou QUALQUER valor negativo/com sinal de menos (ex.: "-R$ 200,00", "R$ -200,00", "- 200,00") ou marcado em verde como crédito que não seja pagamento. Na descricao use o nome do estabelecimento, como na compra original.\n'+
-      '- tipo "pagamento": pagamento da fatura do cartão — "pagamento antecipado", "pagamento recebido", "pagamento de fatura", "pag fatura", "obrigado pelo pagamento", "pagto". Na descricao escreva "Pagamento antecipado da fatura".\n'+
-      'Em todos os tipos, valor é SEMPRE um número positivo (sem o sinal de menos). Ignore saldos, limites disponíveis, totais/resumos da fatura e linhas que não sejam lançamentos.\n'+
-      'Para cada gasto devolva: data (formato AAAA-MM-DD; se a imagem não trouxer o ano, use '+mesId.split('-')[0]+'; se não trouxer nem o mês, use '+mesId+'), descricao (nome do estabelecimento, limpo e curto, sem incluir a categoria e SEM o número da parcela), valor (número positivo com ponto decimal) e categoria (exatamente uma de: '+CATEGORIAS.join(', ')+' — escolha a que melhor descreve o gasto pelo nome do estabelecimento).\n'+
-      'COMPRAS PARCELADAS — atenção máxima, nunca deixe passar: procure em cada compra qualquer sinal de parcelamento, como "1/2", "01/02", "1 de 2", "Parcela 1 de 2", "Parc. 1/2", "2x", "em 2x", "x2", "parcelado". Quando houver, inclua também os campos parcela_atual (número da parcela desta compra; se só aparecer algo como "em 3x" sem dizer qual parcela é, use 1) e parcela_total (quantidade total de parcelas). '+
-      'Nesse caso informe os valores assim: valor_parcela = valor de UMA parcela, quando a imagem mostrar esse valor (ex.: "3x de R$ 50,00" ou um valor marcado como parcela); valor_total = valor total da compra, quando a imagem mostrar (ex.: "R$ 150,00 em 3x" ou um valor marcado como total). '+
-      'Se aparecer só um valor junto do parcelamento e não estiver claro se é a parcela ou o total, considere que é o VALOR TOTAL da compra e coloque em valor_total. Em compras à vista, não inclua parcela_atual, parcela_total, valor_parcela nem valor_total.\n'+
-      'Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown, sem crase. Exemplo: [{"data":"2026-08-12","tipo":"compra","descricao":"Posto Shell","valor":180.5,"categoria":"Transporte"},{"data":"2026-08-13","tipo":"estorno","descricao":"Renner","valor":200,"categoria":"Vestuário"},{"data":"2026-08-15","tipo":"pagamento","descricao":"Pagamento antecipado da fatura","valor":1000,"categoria":"Outros"},{"data":"2026-08-14","descricao":"Magazine Luiza","valor":399,"valor_total":399,"parcela_atual":1,"parcela_total":2,"categoria":"Casa","tipo":"compra"}]';
-  }
-
-  async function lerComIA(entrada){
-    var content=entrada.slice();
-    content.push({type:'text',text:promptExtracao()});
+  // a instrução de leitura é montada no servidor (api/read-receipt.js);
+  // o app só manda o print e o mês aberto.
+  async function lerComIA(imagem){
     var resp=await fetch('/api/read-receipt',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({content:content})
+      body:JSON.stringify({imagem:imagem.source.data,tipo:imagem.source.media_type,mes:mesId})
     });
     var data=null;
     try{ data=await resp.json(); }catch(e){}
@@ -1206,7 +1191,7 @@
       try{
         if(arquivo.size>maxOriginal) throw new Error('arquivo grande');
         var imagem=await reduzirImagemFatura(arquivo);
-        var arr=await lerComIA([imagem]);
+        var arr=await lerComIA(imagem);
         imagem=null;
         extraidos=extraidos.concat(arr);
       }catch(e){
